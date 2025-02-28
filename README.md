@@ -1,7 +1,21 @@
 # mle-template
 Classic MLE template with CI/CD pipelines
 
+```
+python -m src.train
+```
 
+```
+python -m src.preprocess
+```
+
+```
+python -m src.predict --mode predict --message 'I love this product'
+```
+
+```
+uvicorn src.app:app --reload
+```
 
 ```
 curl -X 'POST' \

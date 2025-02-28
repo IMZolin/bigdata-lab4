@@ -87,7 +87,6 @@ class Predictor():
             self.log.error(f"Error loading model/vectorizer: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
         try:
-            self.log.error(type(message))
             cleaned_message = clean_text(message)  
             message_vectorized = vectorizer.transform([cleaned_message]).toarray()  
             sentiment = classifier.predict(message_vectorized)

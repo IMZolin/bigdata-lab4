@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from src.preprocess import DataMaker
+from src.train import Trainer
 from src.predict import Predictor 
 import logging
 
@@ -8,6 +10,10 @@ app = FastAPI()
 class Message(BaseModel):
     message: str
 
+data_maker = DataMaker()
+data_maker.split_data()
+trainer = Trainer()
+trainer.train_naive_bayes(predict=True, alpha=1.0, fit_prior=True)
 predictor = Predictor()
 
 @app.post("/predict/")
