@@ -19,7 +19,9 @@ predictor = Predictor()
 @app.post("/predict/")
 async def predict_sentiment(message: Message):
     try:
+        logging.info("Received message: %s", message.message)  
         result = predictor.predict_sentiment(message.message)
+        logging.info("Prediction result: %s", result)  
         if result:
             return {"sentiment": result} 
         else:
@@ -27,6 +29,7 @@ async def predict_sentiment(message: Message):
     except Exception as e:
         logging.error(f"Error in prediction: {e}")
         raise HTTPException(status_code=500, detail="Prediction failed")
+
 
 @app.get("/health/")
 async def health_check():

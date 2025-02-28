@@ -18,6 +18,12 @@ uvicorn src.app:app --reload
 ```
 
 ```
+coverage run -m unittest src.unit_tests.test_preprocess
+
+coverage report
+```
+
+```
 curl -X 'POST' \
   'http://127.0.0.1:8000/predict/' \
   -H 'accept: application/json' \

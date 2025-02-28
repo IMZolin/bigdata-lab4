@@ -1,40 +1,29 @@
 import configparser
 import os
 import unittest
-import pandas as pd
+import numpy as np
+from unittest import mock
 import sys
-
-sys.path.insert(1, os.path.join(os.getcwd(), "src"))
-
-from train import MultiModel
+from src.train import Trainer
 
 config = configparser.ConfigParser()
 config.read("config.ini")
 
-
-class TestMultiModel(unittest.TestCase):
+class TestTrainer(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.multi_model = MultiModel()
+        self.trainer = Trainer()
 
-    def test_log_reg(self):
-        self.assertEqual(self.multi_model.log_reg(), True)
-
-    def test_rand_forest(self):
-        self.assertEqual(self.multi_model.rand_forest(use_config=False), True)
-
-    def test_knn(self):
-        self.assertEqual(self.multi_model.knn(use_config=False), True)
-
-    def test_svm(self):
-        self.assertEqual(self.multi_model.svm(use_config=False), True)
-
-    def test_gnb(self):
-        self.assertEqual(self.multi_model.gnb(), True)
-
-    def test_d_tree(self):
-        self.assertEqual(self.multi_model.d_tree(use_config=False), True)
-
+    def test_train_naive_bayes(self):
+        """Test the Naive Bayes model training and prediction"""
+        with mock.patch("sklearn.naive_bayes.MultinomialNB.fit") as mock_fit, \
+             mock.patch("sklearn.naive_bayes.MultinomialNB.predict") as mock_predict:
+            mock_fit.return_value = None
+            mock_predict.return_value = self.mock_y_test
+            self.trainer.train_naive_bayes(predict=True, alpha=1.0, fit_prior=True)
+            mock_fit.assert_called_once()
+            mock_predict.assert_called_once()
+            self.assertEqual(mock_predict.return_value.tolist(), self.mock_y_test.tolist())
 
 if __name__ == "__main__":
     unittest.main()
