@@ -134,3 +134,6 @@ data/Test_X.npy
 data/Test_y.npy
 data/Train_X.npy
 data/Train_y.npy
+
+data/Test_X.csv
+data/Train_X.csv
