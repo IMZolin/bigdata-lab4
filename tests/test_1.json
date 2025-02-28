@@ -1,15 +1,18 @@
 {
     "X": [
         {
-            "0": 6.0,
-            "1": 2.2,
-            "2": 4.0,
-            "3": 1.0
+            "0": "I love you guys so much that it hurts. http://tumblr.com/xkh1z19us",
+            "1": "I missed the first hour of SYTYCD last night, and I can't find it online!",
+            "2": "My new car was stolen....by my mother who wanted to go pose at church.",
+            "3": "Wondering why I feel like I do...I'll feel better though...Its all good! I'll be happy inspite of..."
         }
     ],
     "y": [
         {
-            "0": "Iris-versicolor"
+            "0": 1,
+            "1": 1,
+            "2": 0,
+            "3": 1
         }
     ]
 }
