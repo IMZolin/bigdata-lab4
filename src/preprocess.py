@@ -1,5 +1,6 @@
 import configparser
 import os
+import numpy as np
 import pandas as pd
 import re
 import string
@@ -22,12 +23,12 @@ class DataMaker:
         os.makedirs(self.project_path, exist_ok=True)
         self.data_path = os.path.join(self.project_path, "data.csv")
         self.train_path = [
-            os.path.join(self.project_path, "Train_X.csv"),
-            os.path.join(self.project_path, "Train_y.csv"),
+            os.path.join(self.project_path, "Train_X.npy"),
+            os.path.join(self.project_path, "Train_y.npy"),
         ]
         self.test_path = [
-            os.path.join(self.project_path, "Test_X.csv"),
-            os.path.join(self.project_path, "Test_y.csv"),
+            os.path.join(self.project_path, "Test_X.npy"),
+            os.path.join(self.project_path, "Test_y.npy"),
         ]
         self.vectorizer = TfidfVectorizer(max_features=5000, stop_words="english")
         self.log.info("DataMaker is ready")
@@ -53,6 +54,7 @@ class DataMaker:
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=test_size, random_state=42
         )
+
         self.save_splitted_data(X_train, self.train_path[0])
         self.save_splitted_data(y_train, self.train_path[1])
         self.save_splitted_data(X_test, self.test_path[0])
@@ -69,9 +71,10 @@ class DataMaker:
         return all(os.path.isfile(path) for path in self.train_path + self.test_path)
 
     def save_splitted_data(self, df: pd.DataFrame, path: str) -> bool:
-        df.to_csv(path, index=False)
+        np.save(path, df.to_numpy())  
         self.log.info(f"{path} is saved")
         return os.path.isfile(path)
+    
 
 if __name__ == "__main__":
     data_maker = DataMaker()
