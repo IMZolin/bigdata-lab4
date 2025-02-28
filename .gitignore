@@ -137,3 +137,5 @@ data/Train_y.npy
 
 data/Test_X.csv
 data/Train_X.csv
+data/Test_y.csv
+data/Train_y.csv
