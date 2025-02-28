@@ -130,7 +130,7 @@ dmypy.json
 
 # Place data for non local DVC
 # /data 
-/data/Test_X.npy
-/data/Test_y.npy
-/data/Train_X.npy
-/data/Train_y.npy
+data/Test_X.npy
+data/Test_y.npy
+data/Train_X.npy
+data/Train_y.npy
