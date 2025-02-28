@@ -13,6 +13,7 @@ def train_naive_bayes():
     model.fit(X_train, y_train)
     y_pred = model.predict(X_val)
 
+    # Print evaluation metrics
     print(f"Accuracy: {accuracy_score(y_val, y_pred):.4f}")
     print("Classification Report:\n", classification_report(y_val, y_pred))
 
