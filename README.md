@@ -1,13 +1,14 @@
-# mle-template
-Classic MLE template with CI/CD pipelines
+# MLE lab1, Ivan Zolin M4145
+
+```
+python -m src.preprocess
+```
 
 ```
 python -m src.train
 ```
 
-```
-python -m src.preprocess
-```
+
 
 ```
 python -m src.predict --mode predict --message 'I love this product'
