@@ -1,0 +1,54 @@
+name: CD - Deploy and Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install Docker Compose
+        run: |
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose version
+
+      - name: Start services
+        run: docker-compose up -d
+
+      - name: Wait for tests
+        run: |
+          sleep 30
+          docker-compose logs web > test.log
+
+          if grep -q "ERROR" test.log; then
+            echo "❌ Failed with errors"
+            exit 1
+          fi
+
+          if ! grep -q "TESTS PASSED" test.log; then
+            echo "❌ Failed - tests are not passed"
+            exit 1
+          fi
+
+          if ! grep -q "Score on test:" test.log; then
+            echo "❌ Failed - score line not found"
+            exit 1
+          fi
+
+          score=$(grep "Score on test:" test.log | awk -F': ' '{print $2}' | head -n1)
+          awk -v s="$score" 'BEGIN {exit (s < 0.7)}'
+          if [ $? -ne 0 ]; then
+            echo "❌ Failed - score is less than 0.7 (score=$score)"
+            exit 1
+          fi
+
+          echo "✅ Passed"
+
+      - name: Show full report
+        if: always()
+        run: cat test.log

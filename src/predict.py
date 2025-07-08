@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pickle
 from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import accuracy_score, classification_report
 import shutil
 import sys
 import time
@@ -16,6 +17,9 @@ import yaml
 
 from src.logger import Logger
 from src.utils import clean_text, prepare_text
+import warnings
+
+warnings.filterwarnings("ignore")
 
 SHOW_LOG = True
 
@@ -51,45 +55,29 @@ class Predictor():
                                  type=str, 
                                  help="Input Twitter message for sentiment prediction", 
                                  required=False)
-        # self.vectorizer = pickle.load(open(self.config["SPLIT_DATA"]["vectorizer"], "rb"))
-        self.X_train = np.load(self.config["SPLIT_DATA"]["X_train"])
-        self.y_train = np.load(self.config["SPLIT_DATA"]["y_train"])
-        self.X_test = np.load(self.config["SPLIT_DATA"]["X_test"])
-        self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
-        self.sc = StandardScaler()
-        self.X_train = self.sc.fit_transform(self.X_train)
-        self.X_test = self.sc.transform(self.X_test)
         self.log.info("Predictor is ready")
-
-    def predict(self) -> bool:
-        args = self.parser.parse_args()
-        if args.mode == "predict":
-            if args.message:
-                self.predict_sentiment(args.message)
-            else:
-                self.log.error("Please provide a Twitter message for prediction using -msg or --message argument.")
-                sys.exit(1)
-        else:
-            if args.tests == "smoke":
-                self.smoke_test(args)
-            elif args.tests == "func":
-                self.func_test(args)
-        return True
-    
-    def predict_sentiment(self, message: str) -> str:
         try:
-            classifier = pickle.load(open(self.config["NAIVE_BAYES"]["path"], "rb"))
-            vectorizer = pickle.load(open(self.config["SPLIT_DATA"]["vectorizer"], "rb"))
+            self.classifier = pickle.load(open(self.config["NAIVE_BAYES"]["path"], "rb"))
+            self.vectorizer = pickle.load(open(self.config["SPLIT_DATA"]["vectorizer"], "rb"))
         except FileNotFoundError:
             self.log.error("Model file not found.")
             raise HTTPException(status_code=404, detail="Model not found")
         except Exception as e:
             self.log.error(f"Error loading model/vectorizer: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
+
+
+    def predict(self, message: str = None) -> str:
         try:
+            args = self.parser.parse_args()
+            if message is None and args.message is None:
+                self.log.error("Message is not provided.")
+                raise HTTPException(status_code=400, detail="Message is not provided")
+            if message is None:
+                message = args.message
             cleaned_message = clean_text(message)  
-            message_vectorized = vectorizer.transform([cleaned_message]).toarray()  
-            sentiment = classifier.predict(message_vectorized)
+            message_vectorized = self.vectorizer.transform([cleaned_message]).toarray()  
+            sentiment = self.classifier.predict(message_vectorized)
             if sentiment[0] == 1:
                 self.log.info(f"Sentiment for message: '{message}' is Positive")
                 return "Positive sentiment"
@@ -102,51 +90,76 @@ class Predictor():
         except Exception as e:
             self.log.error(f"Error during prediction: {e}")
             raise HTTPException(status_code=500, detail="Prediction error")
+
+    def test(self) -> bool:
+        args = self.parser.parse_args()
+        if args.tests == "smoke":
+            self.smoke_test(args)
+        elif args.tests == "func":
+            self.func_test(args)
+        return True
         
-    def smoke_test(self, args):
+    def smoke_test(self):
         try:
-            classifier = pickle.load(open(self.config["NAIVE_BAYES"]["path"], "rb"))
-            score = classifier.score(self.X_test, self.y_test)
-            print(f'{args.model} has {score} score')
+            score = self.classifier.score(self.X_test, self.y_test)
+            print(f'Model has {score} score')
         except Exception:
             self.log.error(traceback.format_exc())
             sys.exit(1)
-        self.log.info(f'{self.config[args.model]["path"]} passed smoke tests')
+        self.log.info(f'Model passed smoke tests')
 
     def func_test(self, args):
-        tests_path = os.path.join(os.getcwd(), "tests")
-        exp_path = os.path.join(os.getcwd(), "experiments")
-        classifier = pickle.load(open(self.config[args.model]["path"], "rb"))
-        for test in os.listdir(tests_path):
-            with open(os.path.join(tests_path, test)) as f:
-                try:
-                    data = json.load(f)
-                    X = self.sc.transform(pd.json_normalize(data, record_path=['X']))
-                    y = pd.json_normalize(data, record_path=['y'])
-                    score = classifier.score(X, y)
-                    print(f'{args.model} has {score} score')
-                except Exception:
-                    self.log.error(traceback.format_exc())
-                    sys.exit(1)
-                self.log.info(f'{self.config[args.model]["path"]} passed func test {f.name}')
-                exp_data = {
-                    "model": args.model,
-                    "model params": dict(self.config.items(args.model)),
-                    "tests": args.tests,
-                    "score": str(score),
-                    "X_test path": self.config["SPLIT_DATA"]["x_test"],
-                    "y_test path": self.config["SPLIT_DATA"]["y_test"],
-                }
-                date_time = datetime.fromtimestamp(time.time())
-                str_date_time = date_time.strftime("%Y_%m_%d_%H_%M_%S")
-                exp_dir = os.path.join(exp_path, f'exp_{test[:6]}_{str_date_time}')
-                os.mkdir(exp_dir)
-                with open(os.path.join(exp_dir, "exp_config.yaml"), 'w') as exp_f:
-                    yaml.safe_dump(exp_data, exp_f, sort_keys=False)
-                shutil.copy(os.path.join(os.getcwd(), "logfile.log"), os.path.join(exp_dir, "exp_logfile.log"))
-                shutil.copy(self.config[args.model]["path"], os.path.join(exp_dir, f'exp_{args.model}.pkl'))
+        try:
+            tests_path = os.path.join(os.getcwd(), "tests")
+            exp_path = os.path.join(os.getcwd(), "experiments")
+
+            for test in os.listdir(tests_path):
+                with open(os.path.join(tests_path, test)) as f:
+                    try:
+                        data = json.load(f)
+                        X_dict = data["X"][0]
+                        y_dict = data["y"][0]
+
+                        X_text = [X_dict[key] for key in sorted(X_dict.keys(), key=int)]
+                        y = [y_dict[key] for key in sorted(y_dict.keys(), key=int)]
+
+                        cleaned_X = [clean_text(text) for text in X_text]
+                        X_vectorized = self.vectorizer.transform(cleaned_X).toarray()
+                        score = self.classifier.score(X_vectorized, y)
+                        self.log.info(f'{args.tests} test has {score:.3f} score')
+
+                    except Exception:
+                        self.log.error(traceback.format_exc())
+                        sys.exit(1)
+
+                    self.log.info(f'Model passed func test {f.name}')
+                    exp_data = {
+                        "tests": args.tests,
+                        "score": str(score),
+                        "model_path": self.config["NAIVE_BAYES"]["path"],
+                        "test_path": test,
+                    }
+
+                    y_pred = self.classifier.predict(X_vectorized)
+                    accuracy = accuracy_score(y, y_pred)
+                    report = classification_report(y, y_pred)
+                    exp_data['accuracy'] = accuracy
+                    exp_data['classification_report'] = report
+
+                    date_time = datetime.fromtimestamp(time.time())
+                    str_date_time = date_time.strftime("%Y_%m_%d_%H_%M_%S")
+                    exp_dir = os.path.join(exp_path, f'exp_{test[:6]}_{str_date_time}')
+                    os.mkdir(exp_dir)
+
+                    with open(os.path.join(exp_dir, "exp_config.yaml"), 'w') as exp_f:
+                        yaml.safe_dump(exp_data, exp_f, sort_keys=False)
+                    shutil.copy(os.path.join(os.getcwd(), "logfile.log"), os.path.join(exp_dir, "exp_logfile.log"))
+
+        except Exception as e:
+            self.log.error(f"Error during test: {e}")
+            raise HTTPException(status_code=500, detail="Test error")
 
 
 if __name__ == "__main__":
     predictor = Predictor()
-    predictor.predict()
+    predictor.test()
