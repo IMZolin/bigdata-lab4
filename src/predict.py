@@ -3,6 +3,7 @@ import configparser
 from datetime import datetime
 import os
 import json
+from typing import Optional
 from fastapi import HTTPException
 import numpy as np
 import pandas as pd
@@ -23,39 +24,31 @@ warnings.filterwarnings("ignore")
 
 SHOW_LOG = True
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Predictor")
+    parser.add_argument("-t",
+        "--tests",
+        type=str,
+        help="Select tests",
+        required=False,
+        default="smoke",
+        const="smoke",
+        nargs="?",
+        choices=["smoke", "func"])
+    return parser.parse_args()
+
 
 class Predictor():
 
-    def __init__(self) -> None:
+    def __init__(self, args) -> None:
         logger = Logger(SHOW_LOG)
         self.config = configparser.ConfigParser()
         self.log = logger.get_logger(__name__)
         self.config.read("config.ini")
-        self.parser = argparse.ArgumentParser(description="Predictor")
-        self.parser.add_argument("-m",
-                                 "--mode",
-                                 type=str,
-                                 help="Select mode",
-                                 required=True,
-                                 default="predict",
-                                 const="predict",
-                                 nargs="?",
-                                 choices=["predict", "test"])
-        self.parser.add_argument("-t",
-                                 "--tests",
-                                 type=str,
-                                 help="Select tests",
-                                 required=False,
-                                 default="smoke",
-                                 const="smoke",
-                                 nargs="?",
-                                 choices=["smoke", "func"])
-        self.parser.add_argument("-msg", 
-                                 "--message", 
-                                 type=str, 
-                                 help="Input Twitter message for sentiment prediction", 
-                                 required=False)
+        self.args = args
         self.log.info("Predictor is ready")
+        self.X_test = np.load(self.config["SPLIT_DATA"]["x_test"])
+        self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
         try:
             self.classifier = pickle.load(open(self.config["NAIVE_BAYES"]["path"], "rb"))
             self.vectorizer = pickle.load(open(self.config["SPLIT_DATA"]["vectorizer"], "rb"))
@@ -67,14 +60,8 @@ class Predictor():
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
-    def predict(self, message: str = None) -> str:
+    def predict(self, message) -> str:
         try:
-            args = self.parser.parse_args()
-            if message is None and args.message is None:
-                self.log.error("Message is not provided.")
-                raise HTTPException(status_code=400, detail="Message is not provided")
-            if message is None:
-                message = args.message
             cleaned_message = clean_text(message)  
             message_vectorized = self.vectorizer.transform([cleaned_message]).toarray()  
             sentiment = self.classifier.predict(message_vectorized)
@@ -92,23 +79,22 @@ class Predictor():
             raise HTTPException(status_code=500, detail="Prediction error")
 
     def test(self) -> bool:
-        args = self.parser.parse_args()
-        if args.tests == "smoke":
-            self.smoke_test(args)
-        elif args.tests == "func":
-            self.func_test(args)
+        if self.args.tests == "smoke":
+            self.smoke_test()
+        elif self.args.tests == "func":
+            self.func_test()
         return True
         
     def smoke_test(self):
         try:
             score = self.classifier.score(self.X_test, self.y_test)
-            print(f'Model has {score} score')
+            self.log.info(f'Model has {score} score')
         except Exception:
             self.log.error(traceback.format_exc())
             sys.exit(1)
         self.log.info(f'Model passed smoke tests')
 
-    def func_test(self, args):
+    def func_test(self):
         try:
             tests_path = os.path.join(os.getcwd(), "tests")
             exp_path = os.path.join(os.getcwd(), "experiments")
@@ -126,7 +112,7 @@ class Predictor():
                         cleaned_X = [clean_text(text) for text in X_text]
                         X_vectorized = self.vectorizer.transform(cleaned_X).toarray()
                         score = self.classifier.score(X_vectorized, y)
-                        self.log.info(f'{args.tests} test has {score:.3f} score')
+                        self.log.info(f'Test has {score:.3f} score')
 
                     except Exception:
                         self.log.error(traceback.format_exc())
@@ -134,7 +120,6 @@ class Predictor():
 
                     self.log.info(f'Model passed func test {f.name}')
                     exp_data = {
-                        "tests": args.tests,
                         "score": str(score),
                         "model_path": self.config["NAIVE_BAYES"]["path"],
                         "test_path": test,
@@ -150,7 +135,7 @@ class Predictor():
                     str_date_time = date_time.strftime("%Y_%m_%d_%H_%M_%S")
                     exp_dir = os.path.join(exp_path, f'exp_{test[:6]}_{str_date_time}')
                     os.mkdir(exp_dir)
-
+                    self.log.info('TESTS PASSED')
                     with open(os.path.join(exp_dir, "exp_config.yaml"), 'w') as exp_f:
                         yaml.safe_dump(exp_data, exp_f, sort_keys=False)
                     shutil.copy(os.path.join(os.getcwd(), "logfile.log"), os.path.join(exp_dir, "exp_logfile.log"))
@@ -161,5 +146,6 @@ class Predictor():
 
 
 if __name__ == "__main__":
-    predictor = Predictor()
+    args = parse_args()
+    predictor = Predictor(args)
     predictor.test()

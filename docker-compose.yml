@@ -3,8 +3,8 @@ version: '3.8'
 services:
   web:
     build: .
-    image: zolin17/big-data-1:latest
-    container_name: big-data-1
+    image: zolin17/big-data:latest
+    container_name: big-data
     ports:
       - "8000:8000"
     volumes:

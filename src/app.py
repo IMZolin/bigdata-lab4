@@ -16,6 +16,16 @@ trainer = Trainer()
 trainer.train_naive_bayes(predict=True, alpha=1.0, fit_prior=True)
 predictor = Predictor()
 
+class SentimentAPI:
+    def __init__(self):
+        self.app = FastAPI()
+        self.data_maker = DataMaker()
+        self.trainer = Trainer()
+        self.predictor = Predictor()
+        self.data_maker.split_data()
+        self.trainer.train_naive_bayes(predict=True, alpha=1.0, fit_prior=True)
+        self.predictor.predict()
+
 @app.post("/predict/")
 async def predict_sentiment(message: Message):
     try:

@@ -1,0 +1,39 @@
+name: CD - Deploy and Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      
+      - name: Pull Docker image from DockerHub
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/review_clf:latest
+      
+      - name: Run Docker container
+        run: |
+          docker run -d -p 8000:8000 --name review_api ${{ secrets.DOCKERHUB_USERNAME }}/review_clf:latest
+          sleep 10
+
+      - name: Test inference endpoint
+        run: |
+          RESPONSE=$(curl -s -X POST "http://localhost:8000/predict" \
+          -H "Content-Type: application/json" \
+          -d '{"summary": "Nice", "text": "Really good quality", "HelpfulnessNumerator": 3, "HelpfulnessDenominator": 4}')
+          
+          echo "Response: $RESPONSE"
+
+          # Check if get number in response
+          if echo "$RESPONSE" | grep -Eq '[0-9.]'; then
+            echo "Inference successful"
+          else
+            echo "Invalid response"
+            exit 1
+          fi
+
+      - name: Stop container
+        run: docker stop review_api && docker rm review_api
