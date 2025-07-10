@@ -47,8 +47,15 @@ class Predictor():
         self.config.read("config.ini")
         self.args = args
         self.log.info("Predictor is ready")
-        self.X_test = np.load(self.config["SPLIT_DATA"]["x_test"])
-        self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
+        try:
+            self.X_test = np.load(self.config["SPLIT_DATA"]["x_test"])
+            self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
+        except FileNotFoundError:    
+            self.log.error("File missing.")
+            raise HTTPException(status_code=404, detail="File missing")
+        except Exception as e:
+            self.log.error(f"Numpy array load failure: {e}")
+            raise HTTPException(status_code=500, detail="Numpy array load failure")
         try:
             self.classifier = pickle.load(open(self.config["NAIVE_BAYES"]["path"], "rb"))
             self.vectorizer = pickle.load(open(self.config["SPLIT_DATA"]["vectorizer"], "rb"))
@@ -94,6 +101,9 @@ class Predictor():
             self.smoke_test()
         elif self.args.tests == "func":
             self.func_test()
+        else:
+            self.log.error("Unknown test type")
+            raise HTTPException(status_code=400, detail="Unknown test type")
         return True
         
     def smoke_test(self):
@@ -111,8 +121,8 @@ class Predictor():
             exp_path = os.path.join(os.getcwd(), "experiments")
 
             for test in os.listdir(tests_path):
-                with open(os.path.join(tests_path, test)) as f:
-                    try:
+                try:
+                    with open(os.path.join(tests_path, test)) as f:
                         data = json.load(f)
                         X_dict = data["X"][0]
                         y_dict = data["y"][0]
@@ -123,37 +133,38 @@ class Predictor():
                         cleaned_X = [clean_text(text) for text in X_text]
                         X_vectorized = self.vectorizer.transform(cleaned_X).toarray()
                         score = self.classifier.score(X_vectorized, y)
-                        self.log.info(f'Test has {score:.3f} score')
 
-                    except Exception:
-                        self.log.error(traceback.format_exc())
-                        sys.exit(1)
+                        y_pred = self.classifier.predict(X_vectorized)
+                        accuracy = accuracy_score(y, y_pred)
+                        report = classification_report(y, y_pred)
 
-                    self.log.info(f'Model passed func test {f.name}')
-                    exp_data = {
-                        "score": str(score),
-                        "model_path": self.config["NAIVE_BAYES"]["path"],
-                        "test_path": test,
-                    }
+                        exp_data = {
+                            "score": str(score),
+                            "model_path": self.config["NAIVE_BAYES"]["path"],
+                            "test_path": test,
+                            "accuracy": accuracy,
+                            "classification_report": report,
+                        }
 
-                    y_pred = self.classifier.predict(X_vectorized)
-                    accuracy = accuracy_score(y, y_pred)
-                    report = classification_report(y, y_pred)
-                    exp_data['accuracy'] = accuracy
-                    exp_data['classification_report'] = report
+                        date_time = datetime.fromtimestamp(time.time())
+                        str_date_time = date_time.strftime("%Y_%m_%d_%H_%M_%S")
+                        exp_dir = os.path.join(exp_path, f'exp_{test[:6]}_{str_date_time}')
+                        os.mkdir(exp_dir)
 
-                    date_time = datetime.fromtimestamp(time.time())
-                    str_date_time = date_time.strftime("%Y_%m_%d_%H_%M_%S")
-                    exp_dir = os.path.join(exp_path, f'exp_{test[:6]}_{str_date_time}')
-                    os.mkdir(exp_dir)
-                    self.log.info('TESTS PASSED')
-                    with open(os.path.join(exp_dir, "exp_config.yaml"), 'w') as exp_f:
-                        yaml.safe_dump(exp_data, exp_f, sort_keys=False)
-                    shutil.copy(os.path.join(os.getcwd(), "logfile.log"), os.path.join(exp_dir, "exp_logfile.log"))
+                        with open(os.path.join(exp_dir, "exp_config.yaml"), 'w') as exp_f:
+                            yaml.safe_dump(exp_data, exp_f, sort_keys=False)
+                        shutil.copy(os.path.join(os.getcwd(), "logfile.log"), os.path.join(exp_dir, "exp_logfile.log"))
+
+                        self.log.info(f'Model passed func test {f.name}')
+
+                except Exception:
+                    self.log.error(traceback.format_exc())
+                    sys.exit(1)
 
         except Exception as e:
             self.log.error(f"Error during test: {e}")
             raise HTTPException(status_code=500, detail="Test error")
+
 
 
 if __name__ == "__main__":

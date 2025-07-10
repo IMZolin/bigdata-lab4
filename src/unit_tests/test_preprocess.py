@@ -6,17 +6,22 @@ import pandas as pd
 import numpy as np
 import sys
 
+from src.logger import Logger
+
 sys.path.insert(1, os.path.join(os.getcwd(), "src"))
 
 from preprocess import DataMaker
 
 config = configparser.ConfigParser()
 config.read("config.ini")
+SHOW_LOG = True
 
 
 class TestDataMaker(unittest.TestCase):
 
     def setUp(self) -> None:
+        logger = Logger(SHOW_LOG)
+        self.log = logger.get_logger(__name__)
         self.data_maker = DataMaker()
 
     @patch.object(DataMaker, 'save_splitted_data')
@@ -65,4 +70,5 @@ class TestDataMaker(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    Logger(SHOW_LOG).get_logger(__name__).info("TEST PREPROCESSING IS READY")
     unittest.main()
