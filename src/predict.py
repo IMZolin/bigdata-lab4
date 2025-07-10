@@ -62,6 +62,12 @@ class Predictor():
 
     def predict(self, message) -> str:
         try:
+            if not message:
+                self.log.error("Message is not provided")
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Message is not provided. Please provide a message to analyze."
+                )
             cleaned_message = clean_text(message)  
             message_vectorized = self.vectorizer.transform([cleaned_message]).toarray()  
             sentiment = self.classifier.predict(message_vectorized)
@@ -74,9 +80,14 @@ class Predictor():
             else:
                 self.log.error(f"Unexpected sentiment value: {sentiment[0]}")
                 return "Unknown sentiment"
+        except HTTPException:
+            raise
         except Exception as e:
             self.log.error(f"Error during prediction: {e}")
-            raise HTTPException(status_code=500, detail="Prediction error")
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Prediction error: {e}"
+            )
 
     def test(self) -> bool:
         if self.args.tests == "smoke":
