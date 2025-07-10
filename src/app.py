@@ -1,46 +1,47 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+import uvicorn
 from src.preprocess import DataMaker
 from src.train import Trainer
-from src.predict import Predictor 
+from src.predict import Predictor, parse_args
 import logging
+import configparser
 
-app = FastAPI()
 
 class Message(BaseModel):
     message: str
 
-data_maker = DataMaker()
-data_maker.split_data()
-trainer = Trainer()
-trainer.train_naive_bayes(predict=True, alpha=1.0, fit_prior=True)
-predictor = Predictor()
-
 class SentimentAPI:
-    def __init__(self):
+    def __init__(self, args=None):
         self.app = FastAPI()
-        self.data_maker = DataMaker()
-        self.trainer = Trainer()
         self.predictor = Predictor()
-        self.data_maker.split_data()
-        self.trainer.train_naive_bayes(predict=True, alpha=1.0, fit_prior=True)
-        self.predictor.predict()
+        self.args = args or parse_args()
+        self._setup_routes()
+        
+    def _setup_routes(self):
+        @self.app.post("/predict/")
+        async def predict_sentiment(message: Message):
+            try:
+                logging.info("Received message: %s", message.message)  
+                result = self.predictor.predict(message.message)
+                logging.info("Prediction result: %s", result)  
+                if result:
+                    return {"sentiment": result} 
+                else:
+                    raise HTTPException(status_code=500, detail="Error during prediction")
+            except Exception as e:
+                logging.error(f"Error in prediction: {e}")
+                raise HTTPException(status_code=500, detail="Prediction failed")
 
-@app.post("/predict/")
-async def predict_sentiment(message: Message):
-    try:
-        logging.info("Received message: %s", message.message)  
-        result = predictor.predict_sentiment(message.message)
-        logging.info("Prediction result: %s", result)  
-        if result:
-            return {"sentiment": result} 
-        else:
-            raise HTTPException(status_code=500, detail="Error during prediction")
-    except Exception as e:
-        logging.error(f"Error in prediction: {e}")
-        raise HTTPException(status_code=500, detail="Prediction failed")
+        @self.app.get("/health/")
+        async def health_check():
+            return {"status": "OK"}
+        
+    def run(self):
+        uvicorn.run(self.app, host="0.0.0.0", port=8000)
 
 
-@app.get("/health/")
-async def health_check():
-    return {"status": "OK"}
+if __name__ == "__main__":
+    args = parse_args()
+    sentiment_api = SentimentAPI(args)
+    sentiment_api.run()

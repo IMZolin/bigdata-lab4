@@ -23,6 +23,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 SHOW_LOG = True
+sys.path.insert(0, os.path.join(os.getcwd(), "src"))
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Predictor")
@@ -40,7 +41,7 @@ def parse_args():
 
 class Predictor():
 
-    def __init__(self, args) -> None:
+    def __init__(self, args=None) -> None:
         logger = Logger(SHOW_LOG)
         self.config = configparser.ConfigParser()
         self.log = logger.get_logger(__name__)
