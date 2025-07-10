@@ -1,35 +1,31 @@
 # MLE lab1, Ivan Zolin M4145
 
-```
-python -m src.preprocess
+### Build and Run Services
+
+```bash
+# Build Docker images from the Dockerfile
+docker-compose build
+
+# Start the REST API service
+docker-compose up web
+
+# Run the tests inside the test service
+docker-compose run test
 ```
 
-```
-python -m src.train
-```
-
-
+### Example Request to the Web Service
 
 ```
-python -m src.predict --mode predict --message 'I love this product'
+curl -X POST \
+  http://localhost:8000/predict/ \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{"message": "I love this product!"}'
 ```
 
+Expected response:
 ```
-uvicorn src.app:app --reload
-```
-
-```
-coverage run -m unittest src.unit_tests.test_preprocess
-
-coverage report
-```
-
-```
-curl -X 'POST' \
-  'http://localhost:8000/predict/' \
-  -H 'accept: application/json' \
-  -H 'Content-Type: application/json' \
-  -d '{
-  "message": "I love this product!"
-}'
+{
+  "sentiment": "Positive sentiment"
+}
 ```
