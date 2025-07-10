@@ -1,11 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
-from src.preprocess import DataMaker
-from src.train import Trainer
 from src.predict import Predictor, parse_args
 import logging
-import configparser
 
 
 class Message(BaseModel):
