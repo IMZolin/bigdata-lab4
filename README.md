@@ -1,4 +1,4 @@
-# MLE lab1, Ivan Zolin M4145
+# MLE lab2, Ivan Zolin M4145
 
 ### Build and Run Services
 
