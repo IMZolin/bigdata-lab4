@@ -7,7 +7,6 @@ import clickhouse_connect
 class ClickHouseClient:
     def __init__(self, host: str, port: int, user: str, password: str):
         self.logger = Logger(show=True).get_logger(__name__)
-        self.config = configparser.ConfigParser()
         self.host = host
         self.port = port
         self.user = user
@@ -27,7 +26,6 @@ class ClickHouseClient:
         except Exception as e:
             self.logger.error(f"Error connecting to ClickHouse: {e}")
             sys.exit(1)
-            return False
 
     def close(self):
         if self.client:

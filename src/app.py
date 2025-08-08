@@ -3,10 +3,14 @@ from pydantic import BaseModel
 import uvicorn
 from src.predict import Predictor, parse_args
 from logger import Logger
-
+from src.database import ClickHouseClient  
+import configparser
+import os
+from dotenv import load_dotenv
 
 class Message(BaseModel):
     message: str
+
 
 class SentimentAPI:
     def __init__(self, args=None):
@@ -14,22 +18,36 @@ class SentimentAPI:
         self.logger = Logger(show=True).get_logger(__name__)
         self.predictor = Predictor()
         self.args = args or parse_args()
+        load_dotenv()  # load .env file into environment variables
         self._setup_database()
         self._setup_routes()
 
     def _setup_database(self):
-        """Initialize database connection"""
-        pass
-    
+        host = os.getenv("CLICKHOUSE_HOST", "localhost")
+        port = int(os.getenv("CLICKHOUSE_PORT", 9000))
+        user = os.getenv("CLICKHOUSE_USER", "default")
+        password = os.getenv("CLICKHOUSE_PASSWORD", "")
+
+        self.db_client = ClickHouseClient(host, port, user, password)
+        self.db_client.connect()
+        self.db_client.create_table("predictions")
+
     def _setup_routes(self):
         @self.app.post("/predict/")
         async def predict_sentiment(message: Message):
             try:
-                self.logger.info("Received message: %s", message.message)  
+                self.logger.info("Received message: %s", message.message)
                 result = self.predictor.predict(message.message)
-                self.logger.info("Prediction result: %s", result)  
+                self.logger.info("Prediction result: %s", result)
+
+                try:
+                    self.db_client.insert_data("predictions", message.message, result)
+                    self.logger.info("Saved prediction to DB with message: %s and result: %s", message.message, result)
+                except Exception as e:
+                    self.logger.error(f"Failed to save prediction to DB: {e}")
+
                 if result:
-                    return {"sentiment": result} 
+                    return {"sentiment": result}
                 else:
                     raise HTTPException(status_code=500, detail="Error during prediction")
             except Exception as e:
@@ -39,9 +57,10 @@ class SentimentAPI:
         @self.app.get("/health/")
         async def health_check():
             return {"status": "OK"}
-        
+
     def run(self):
         uvicorn.run(self.app, host="0.0.0.0", port=8000)
+
 
 def main():
     args = parse_args()

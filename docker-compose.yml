@@ -1,10 +1,28 @@
 version: '3.8'
 
 services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+
   web:
     build: .
-    image: zolin17/big-data:latest
+    image: zolin17/big-data-2:latest
     container_name: big-data
+    depends_on:
+      - clickhouse
     command: bash -c "
       python src/preprocess.py &&
       python src/train.py &&
@@ -16,9 +34,16 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
 
   test:
     image: zolin17/big-data:latest
+    depends_on:
+      - clickhouse
     command: bash -c "
       python src/preprocess.py &&
       python src/train.py &&
@@ -29,3 +54,11 @@ services:
       - .:/app
     environment:
       - PYTHONPATH=/app
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+
+volumes:
+  clickhouse_data:
