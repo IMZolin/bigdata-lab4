@@ -109,12 +109,14 @@ class Predictor():
         
     def smoke_test(self):
         try:
+            if not callable(getattr(self.classifier, "score", None)):
+                raise Exception("Classifier does not implement score method")
             score = self.classifier.score(self.X_test, self.y_test)
-            self.log.info(f'Model has {score} score')
+            self.log.info(f"Model has {score} score")
         except Exception:
             self.log.error(traceback.format_exc())
             sys.exit(1)
-        self.log.info(f'Model passed smoke tests')
+        self.log.info("Model passed smoke tests")
 
     def func_test(self):
         try:

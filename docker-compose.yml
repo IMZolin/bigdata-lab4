@@ -41,7 +41,7 @@ services:
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
 
   test:
-    image: zolin17/big-data:latest
+    image: zolin17/big-data-2:latest
     depends_on:
       - clickhouse
     command: bash -c "
