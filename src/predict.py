@@ -41,15 +41,15 @@ def parse_args():
 
 class Predictor():
 
-    def __init__(self, args=None) -> None:
+    def __init__(self, config_path="config.ini", args=None) -> None:
         logger = Logger(SHOW_LOG)
         self.config = configparser.ConfigParser()
         self.log = logger.get_logger(__name__)
-        self.config.read("config.ini")
-        self.args = args
+        self.config.read(config_path)
+        self.args = args if args is not None else argparse.Namespace(tests="smoke")
         self.log.info("Predictor is ready")
         try:
-            self.X_test = np.load(self.config["SPLIT_DATA"]["x_test"])
+            self.X_test = np.load(self.config["SPLIT_DATA"]["X_test"])
             self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
         except FileNotFoundError:    
             self.log.error("File missing.")
@@ -58,8 +58,10 @@ class Predictor():
             self.log.error(f"Numpy array load failure: {e}")
             raise HTTPException(status_code=500, detail="Numpy array load failure")
         try:
-            self.classifier = pickle.load(open(self.config["NAIVE_BAYES"]["path"], "rb"))
-            self.vectorizer = pickle.load(open(self.config["SPLIT_DATA"]["vectorizer"], "rb"))
+            with open(self.config["NAIVE_BAYES"]["path"], "rb") as model_file:
+                self.classifier = pickle.load(model_file)
+            with open(self.config["SPLIT_DATA"]["vectorizer"], "rb") as vectorizer_file:
+                self.vectorizer = pickle.load(vectorizer_file)
         except FileNotFoundError:
             self.log.error("Model file not found.")
             raise HTTPException(status_code=404, detail="Model not found")
@@ -77,7 +79,7 @@ class Predictor():
                     detail="Message is not provided. Please provide a message to analyze."
                 )
             cleaned_message = clean_text(message)  
-            message_vectorized = self.vectorizer.transform([cleaned_message]).toarray()  
+            message_vectorized = self.vectorizer.transform([cleaned_message])  
             sentiment = self.classifier.predict(message_vectorized)
             if sentiment[0] == 1:
                 self.log.info(f"Sentiment for message: '{message}' is Positive")
@@ -109,8 +111,10 @@ class Predictor():
         
     def smoke_test(self):
         try:
-            score = self.classifier.score(self.X_test, self.y_test)
-            self.log.info(f'Model has {score} score')
+            print(self.y_test.shape, self.X_test.shape)
+            y_pred = self.classifier.predict(self.X_test)
+            accuracy = accuracy_score(self.y_test, y_pred)
+            self.log.info(f'Model has {accuracy} Accuracy score')
         except Exception:
             self.log.error(traceback.format_exc())
             sys.exit(1)
@@ -186,5 +190,5 @@ class Predictor():
 
 if __name__ == "__main__":
     args = parse_args()
-    predictor = Predictor(args)
+    predictor = Predictor(args=args, config_path="config.ini")
     predictor.test()

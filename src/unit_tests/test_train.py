@@ -22,19 +22,19 @@ class TestTrainer(unittest.TestCase):
     def setUp(self) -> None:
         logger = Logger(SHOW_LOG)
         self.log = logger.get_logger(__name__)
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.temp_config_path = os.path.join(self.temp_dir.name, "config.ini")
+        # self.temp_dir = tempfile.TemporaryDirectory()
+        # self.temp_config_path = os.path.join(self.temp_dir.name, "config.ini")
 
-        with open(self.temp_config_path, 'w') as f:
-            config.write(f)
-        self.trainer = Trainer(config_path=self.temp_config_path)
+        # with open(self.temp_config_path, 'w') as f:
+        #     config.write(f)
+        self.trainer = Trainer(config_path="config.ini")
 
-    def tearDown(self) -> None: 
-        if os.path.isdir(self.trainer.project_path):
-            for f in os.listdir(self.trainer.project_path):
-                os.remove(os.path.join(self.trainer.project_path, f))
-            os.rmdir(self.trainer.project_path)
-        self.temp_dir.cleanup()
+    # def tearDown(self) -> None: 
+    #     if os.path.isdir(self.trainer.project_path):
+    #         for f in os.listdir(self.trainer.project_path):
+    #             os.remove(os.path.join(self.trainer.project_path, f))
+    #         os.rmdir(self.trainer.project_path)
+        # self.temp_dir.cleanup()
 
     def test_init_data(self):
         self.assertIsNotNone(self.trainer.X_train, "X_train shouldn't be None after initialization")
