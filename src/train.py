@@ -1,3 +1,4 @@
+
 import configparser
 import os
 import numpy as np
@@ -13,21 +14,22 @@ import yaml
 SHOW_LOG = True
 
 class Trainer:
-    def __init__(self):
+    def __init__(self, config_path="config.ini"):
         logger = Logger(SHOW_LOG)
         self.config = configparser.ConfigParser()
         self.log = logger.get_logger(__name__)
-        self.config.read("config.ini")
+        self.config_path = config_path
+        self.config.read(config_path)
+        self.base_dir = os.path.dirname(os.path.abspath(config_path))
         self.X_train = np.load(self.config["SPLIT_DATA"]["X_train"])
         self.y_train = np.load(self.config["SPLIT_DATA"]["y_train"])
         self.X_test = np.load(self.config["SPLIT_DATA"]["X_test"])
         self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
-
         folder_name = f"{'NAIVE_BAYES'}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         self.project_path = os.path.join(os.getcwd(), "experiments", folder_name)
         self.bayes_path = os.path.join(self.project_path, "naive_bayes.pkl")
 
-        self.config_path = os.path.join(self.project_path, "config.yml")
+        self.model_config = os.path.join(self.project_path, "config.yml")
         self.metrics_path = os.path.join(self.project_path, "metrics.yml")
         self.logs_path = os.path.join(self.project_path, "logs.txt")
         self.log.info("Trainer is ready")
@@ -55,14 +57,17 @@ class Trainer:
 
     def save_model(self, classifier, path: str, name: str, params: dict, metrics: dict) -> bool:
         os.makedirs(self.project_path, exist_ok=True)
+        params['path'] = os.path.relpath(path, start=os.getcwd())
         self.config[name] = params
-        os.remove('config.ini')
-        with open('config.ini', 'w') as configfile:
-            self.config.write(configfile)
+        os.remove(self.config_path)
 
         with open(self.config_path, 'w') as configfile:
+            self.config.write(configfile)
+        self.log.info(f"Config updated at {self.config_path}")
+
+        with open(self.model_config, 'w') as configfile:
             yaml.dump(params, configfile)
-        self.log.info(f"Config saved at {self.config_path}")
+        self.log.info(f"Model params saved at {self.model_config}")
 
         with open(path, 'wb') as f:
             pickle.dump(classifier, f)
@@ -78,6 +83,7 @@ class Trainer:
             logfile.write(f"Metrics: {metrics}\n")
         self.log.info(f"Logs saved at {self.logs_path}")
         return os.path.isfile(path)
+
 
 if __name__ == "__main__":
     trainer = Trainer()

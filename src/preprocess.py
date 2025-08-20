@@ -15,9 +15,10 @@ TEST_SIZE = 0.2
 SHOW_LOG = True
 
 class DataMaker:
-    def __init__(self) -> None:
+    def __init__(self, config_path="config.ini") -> None:
         self.logger = Logger(SHOW_LOG)
         self.config = configparser.ConfigParser()
+        self.config_path = config_path
         self.log = self.logger.get_logger(__name__)
         self.project_path = os.path.join(os.getcwd(), "data")
         os.makedirs(self.project_path, exist_ok=True)
@@ -38,9 +39,10 @@ class DataMaker:
         if not os.path.isfile(self.data_path):
             self.log.error(f"Training data file {self.data_path} not found!")
             return False
+
         dataset = pd.read_csv(self.data_path, encoding="ISO-8859-1")
         dataset["SentimentText"] = dataset["SentimentText"].astype(str).apply(clean_text)
-        
+
         X_tfidf = prepare_text(dataset["SentimentText"], self.vectorizer)
         y = dataset[["Sentiment"]]
 
@@ -55,17 +57,18 @@ class DataMaker:
 
         with open(self.vectorizer_path, "wb") as vec_file:
             pickle.dump(self.vectorizer, vec_file)
-        
+
         self.config["SPLIT_DATA"] = {
-            "X_train": self.train_path[0],
-            "y_train": self.train_path[1],
-            "X_test": self.test_path[0],
-            "y_test": self.test_path[1],
-            "vectorizer": self.vectorizer_path,
+            "X_train": os.path.relpath(self.train_path[0], start=os.getcwd()),
+            "y_train": os.path.relpath(self.train_path[1], start=os.getcwd()),
+            "X_test": os.path.relpath(self.test_path[0], start=os.getcwd()),
+            "y_test": os.path.relpath(self.test_path[1], start=os.getcwd()),
+            "vectorizer": os.path.relpath(self.vectorizer_path, start=os.getcwd()),
         }
         self.log.info("Train and test data is ready")
-        with open("config.ini", "w") as configfile:
+        with open(self.config_path, "w") as configfile:
             self.config.write(configfile)
+        self.log.info(f"Config file updated at {self.config_path}")
         return all(os.path.isfile(path) for path in self.train_path + self.test_path)
 
     def save_splitted_data(self, df: np.ndarray, path: str) -> bool:

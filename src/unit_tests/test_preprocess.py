@@ -1,5 +1,6 @@
 import configparser
 import os
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
 import pandas as pd
@@ -22,8 +23,15 @@ class TestDataMaker(unittest.TestCase):
     def setUp(self) -> None:
         logger = Logger(SHOW_LOG)
         self.log = logger.get_logger(__name__)
-        self.data_maker = DataMaker()
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_config_path = os.path.join(self.temp_dir.name, "config.ini")
+        with open(self.temp_config_path, 'w') as f:
+            config.write(f)
+        self.data_maker = DataMaker(config_path=self.temp_config_path)
 
+    def tearDown(self) -> None: 
+        self.temp_dir.cleanup()
+        
     @patch.object(DataMaker, 'save_splitted_data')
     def test_split_data(self, mock_save_splitted_data):
         mock_save_splitted_data.return_value = True
