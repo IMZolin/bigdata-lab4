@@ -20,7 +20,7 @@ jobs:
           echo "CLICKHOUSE_DATABASE=mydb" >> .env
       
       - name: Pull Docker image from DockerHub
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data2:latest
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-2:latest
       
       - name: Start containers with docker compose
         run: docker compose up -d
@@ -58,4 +58,4 @@ jobs:
           PREDICTIONS_COUNT=$(echo "$PREDICTIONS_RESPONSE" | jq '.predictions | length')
 
       - name: Stop and remove container
-        run: docker stop big-data && docker rm big-data
+        run: docker stop big-data-2 && docker rm big-data-2
