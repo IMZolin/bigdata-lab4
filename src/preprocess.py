@@ -15,12 +15,19 @@ TEST_SIZE = 0.2
 SHOW_LOG = True
 
 class DataMaker:
-    def __init__(self) -> None:
+    def __init__(self, config_path="config.ini", project_path=None) -> None:
         self.logger = Logger(SHOW_LOG)
-        self.config = configparser.ConfigParser()
         self.log = self.logger.get_logger(__name__)
-        self.project_path = os.path.join(os.getcwd(), "data")
+        self.config_path = config_path
+        self.config = configparser.ConfigParser()
+        self.config.read(self.config_path)
+
+        if project_path:
+            self.project_path = project_path
+        else:
+            self.project_path = os.path.join(os.getcwd(), "data")
         os.makedirs(self.project_path, exist_ok=True)
+
         self.data_path = os.path.join(self.project_path, "data.csv")
         self.train_path = [
             os.path.join(self.project_path, "Train_X.npy"),
@@ -70,7 +77,7 @@ class DataMaker:
             "vectorizer": rel_vectorizer,
         }
         self.log.info("Train and test data is ready")
-        with open("config.ini", "w") as configfile:
+        with open(self.config_path, "w") as configfile:
             self.config.write(configfile)
         return all(os.path.isfile(path) for path in self.train_path + self.test_path)
 

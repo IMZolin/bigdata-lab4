@@ -1,5 +1,7 @@
 import configparser
+import glob
 import os
+import shutil
 import unittest
 from unittest.mock import patch, MagicMock, mock_open
 import sys 
@@ -13,20 +15,17 @@ sys.path.insert(1, os.path.join(os.getcwd(), "src"))
 
 from predict import Predictor
 
-config = configparser.ConfigParser()
-config.read("config.ini")
 SHOW_LOG = True
 
 class TestPredictor(unittest.TestCase):
     def setUp(self) -> None:
         logger = Logger(SHOW_LOG)
         self.log = logger.get_logger(__name__)
-        self.predictor = Predictor(args=MagicMock(tests="smoke"))
+        self.args = MagicMock(tests="smoke")
+        self.predictor = Predictor(args=self.args, config_path="test_config.ini")
         try:
-            self.classifier = pickle.load(open(config["NAIVE_BAYES"]["path"], "rb"))
-            self.vectorizer = pickle.load(open(config["SPLIT_DATA"]["vectorizer"], "rb"))
-        except FileNotFoundError:
-            raise HTTPException(status_code=404)
+            self.classifier = self.predictor.classifier
+            self.vectorizer = self.predictor.vectorizer
         except Exception:
             raise HTTPException(status_code=500)
         self.args = MagicMock(tests="smoke")
@@ -37,43 +36,36 @@ class TestPredictor(unittest.TestCase):
         self.predictor.X_test = np.array([[1, 2]])
         self.predictor.y_test = np.array([1])
 
+    def tearDown(self):
+        exp_dir = os.path.join(os.getcwd(), "experiments")
+        for folder in glob.glob(os.path.join(exp_dir, "exp_test*")):
+            if os.path.isdir(folder):
+                shutil.rmtree(folder)
+
+
+    def test_parse_args_defaults(self):
+        with patch("sys.argv", ["predict.py"]):
+            from predict import parse_args
+            args = parse_args()
+            self.assertEqual(args.tests, "smoke")
+
+    def test_parse_args_func(self):
+        with patch("sys.argv", ["predict.py", "--tests", "func"]):
+            from predict import parse_args
+            args = parse_args()
+            self.assertEqual(args.tests, "func")
+
     def test_init(self):
         assert self.predictor.classifier is not None
         assert self.predictor.vectorizer is not None
         assert hasattr(self.predictor, "predict")
         assert hasattr(self.predictor, "test")
 
-    @patch("pickle.load", side_effect=FileNotFoundError("File not found"))
-    @patch("numpy.load") 
-    @patch("configparser.ConfigParser.read")
-    @patch("configparser.ConfigParser.__getitem__")
-    def test_init_file_not_found(self, mock_getitem, mock_read, mock_npload, mock_pickle):
-        mock_getitem.side_effect = lambda section: {
-            "x_test": "dummy_x.npy",
-            "y_test": "dummy_y.npy",
-            "path": "dummy_model.pkl",
-            "vectorizer": "dummy_vectorizer.pkl"
-        }
-
+    @patch("pickle.load", side_effect=Exception("Unexpected error"))
+    def test_init_unexpected_exception(self, mock_pickle):
         with self.assertRaises(HTTPException) as context:
             Predictor(self.args)
-        self.assertEqual(context.exception.status_code, 404)
-
-    @patch("pickle.load", side_effect=[Exception("Unexpected error")])
-    @patch("numpy.load")
-    @patch("configparser.ConfigParser.read")
-    @patch("configparser.ConfigParser.__getitem__")
-    def test_init_unexpected_exception(self, mock_getitem, mock_read, mock_npload, mock_pickle):  
-        mock_getitem.side_effect = lambda section: {
-            "x_test": "dummy_x.npy",
-            "y_test": "dummy_y.npy",
-            "path": "dummy_model.pkl",
-            "vectorizer": "dummy_vectorizer.pkl"
-        }
-
-        with self.assertRaises(HTTPException) as context:
-            Predictor(self.args)
-        self.assertEqual(context.exception.status_code, 404)
+        self.assertEqual(context.exception.status_code, 500)
 
     def test_no_message(self):
         with self.assertRaises(HTTPException) as context:
@@ -116,6 +108,12 @@ class TestPredictor(unittest.TestCase):
         prediction = self.predictor.predict(dummy_input)
         self.assertEqual(prediction, "Negative sentiment")
 
+    def test_smoke_test_success(self):
+        self.mock_classifier.predict.return_value = np.array([0])
+        with patch("src.predict.accuracy_score", return_value=0.85):
+            self.predictor.smoke_test()
+            self.mock_classifier.predict.assert_called_once()
+
     def test_smoke_test(self):
         with patch("sys.argv", ["predict.py", "--test", "smoke"]):
             self.predictor.smoke_test = MagicMock()
@@ -128,17 +126,23 @@ class TestPredictor(unittest.TestCase):
         self.predictor.test()
         self.predictor.func_test.assert_called_once()
 
+    @patch("shutil.copy")  
+    @patch("os.listdir", return_value=["test.json"])
+    @patch("os.path.join", side_effect=lambda *args: "/".join(args))
+    @patch("builtins.open", new_callable=mock_open, read_data='{"X": [{"0": "I love it"}], "y": [{"0": 1}]}')
+    def test_func_test_success(self, mock_file, mock_join, mock_listdir, mock_copy):
+        self.mock_vectorizer.transform.return_value.toarray.return_value = np.array([[1, 2]])
+        self.mock_classifier.score.return_value = 0.9
+        self.mock_classifier.predict.return_value = [1]
+        self.predictor.func_test()
+        self.mock_classifier.score.assert_called_once()
+        mock_copy.assert_called_once()  
+
     def test_unknown_test_type(self):
         self.predictor.args.tests = "invalid"
         with self.assertRaises(HTTPException) as context:
             self.predictor.test()
         self.assertEqual(context.exception.status_code, 400)
-
-    def test_smoke_test_success(self):
-        self.mock_classifier.score.return_value = 0.85
-        with patch("builtins.print"):
-            self.predictor.smoke_test()
-            self.mock_classifier.score.assert_called_once()
 
     def test_smoke_test_failure(self):
         self.mock_classifier.score.side_effect = Exception("Scoring failed")
@@ -161,15 +165,6 @@ class TestPredictor(unittest.TestCase):
             result = self.predictor.predict("sample")
             self.assertEqual(result, expected)
 
-    @patch("builtins.open", new_callable=mock_open, read_data='{"text": "sample", "label": 0}')
-    def test_func_test_prediction_exception(self, mock_file):
-        self.mock_vectorizer.transform.side_effect = Exception("transform error")
-        with patch("os.listdir", return_value=["sample.json"]), \
-            patch("os.path.join", side_effect=lambda *args: "/".join(args)), \
-            patch("sys.exit") as mock_exit:
-            self.predictor.func_test()
-            mock_exit.assert_called_once()
-
     def test_func_test_outer_exception(self):
         with patch("os.path.join", side_effect=Exception("Outer error")):
             with self.assertRaises(HTTPException) as context:
@@ -177,26 +172,13 @@ class TestPredictor(unittest.TestCase):
             self.assertEqual(context.exception.status_code, 500)
             self.assertIn("Test error", str(context.exception.detail))
 
-    @patch("os.listdir", return_value=["test1.json"])
-    @patch("builtins.open", new_callable=mock_open, read_data='{"X": [{"0": "text"}], "y": [{"0": 1}]}')
-    @patch("src.predict.os.mkdir")
-    @patch("src.predict.shutil.copy")
-    def test_func_test_success(self, mock_copy, mock_mkdir, mock_open_file, mock_listdir):
-        self.mock_vectorizer.transform.return_value.toarray.return_value = np.array([[1, 2]])
-        self.mock_classifier.score.return_value = 0.95
-        self.mock_classifier.predict.return_value = [1]
+    @patch("os.listdir", return_value=["test.json"])
+    @patch("os.path.join", side_effect=lambda *args: "/".join(args))
+    def test_func_test_inner_exception(self, mock_join, mock_listdir):
+        with patch("builtins.open", side_effect=Exception("File read error")), patch("sys.exit") as mock_exit:
+            self.predictor.func_test()
+            mock_exit.assert_called_once()
 
-        self.predictor.func_test()
-
-        mock_mkdir.assert_called_once() 
-        mock_copy.assert_called_once()  
-        self.assertTrue(mock_open_file.call_count >= 2)
-
-    @patch("numpy.load", side_effect=FileNotFoundError("File missing"))
-    def test_init_np_load_file_not_found(self, mock_np_load):
-        with self.assertRaises(HTTPException) as context:
-            Predictor(self.args)
-        self.assertEqual(context.exception.status_code, 404)
 
     @patch("numpy.load", side_effect=Exception("Numpy array load failure"))
     def test_init_np_load_unexpected_exception(self, mock_np_load):

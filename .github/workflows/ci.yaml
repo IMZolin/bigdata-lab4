@@ -27,14 +27,7 @@ jobs:
 
     - name: Run unit tests
       run: |
-        python -m src.preprocess
-        python -m src.train
-        python -m unittest src.unit_tests.test_utils
-        python -m unittest src.unit_tests.test_database
-        python -m unittest src.unit_tests.test_preprocess
-        python -m unittest src.unit_tests.test_train
-        python -m unittest src.unit_tests.test_predict
-        coverage report -m 
+        pytest --cov=src --cov-report=term-missing src/unit_tests 
 
     - name: Log in to DockerHub
       uses: docker/login-action@v1

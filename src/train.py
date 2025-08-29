@@ -57,32 +57,36 @@ class Trainer:
 
     def save_model(self, classifier, path: str, name: str, params: dict, metrics: dict) -> bool:
         os.makedirs(self.project_path, exist_ok=True)
+        with open(path, 'wb') as f:
+            pickle.dump(classifier, f)
+        self.log.info(f'{path} is saved')
+
         params['path'] = os.path.relpath(path, start=os.getcwd())
-        self.config[name] = params
-        os.remove(self.config_path)
+        if name not in self.config.sections():
+            self.config.add_section(name)
+        for k, v in params.items():
+            self.config.set(name, k, str(v))
 
         with open(self.config_path, 'w') as configfile:
             self.config.write(configfile)
         self.log.info(f"Config updated at {self.config_path}")
 
-        with open(self.model_config, 'w') as configfile:
-            yaml.dump(params, configfile)
+        # Save params separately
+        with open(self.model_config, 'w') as f:
+            yaml.dump(params, f)
         self.log.info(f"Model params saved at {self.model_config}")
 
-        with open(path, 'wb') as f:
-            pickle.dump(classifier, f)
-        self.log.info(f'{path} is saved')
-
+        # Save metrics
         with open(self.metrics_path, 'w') as metricsfile:
             yaml.dump(metrics, metricsfile)
         self.log.info(f"Metrics saved at {self.metrics_path}")
-
         with open(self.logs_path, 'w') as logfile:
             logfile.write(f"Naive Bayes Training\n")
             logfile.write(f"Parameters: {params}\n")
             logfile.write(f"Metrics: {metrics}\n")
         self.log.info(f"Logs saved at {self.logs_path}")
         return os.path.isfile(path)
+
 
 
 if __name__ == "__main__":

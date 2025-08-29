@@ -43,6 +43,7 @@ class Predictor():
 
     def __init__(self, config_path="config.ini", args=None) -> None:
         logger = Logger(SHOW_LOG)
+        self.config_path = config_path
         self.config = configparser.ConfigParser()
         self.log = logger.get_logger(__name__)
         self.config.read(config_path)

@@ -1,5 +1,5 @@
 score: '0.75'
-model_path: experiments/NAIVE_BAYES_20250820_154949/naive_bayes.pkl
+model_path: experiments/NAIVE_BAYES_20250829_201853/naive_bayes.pkl
 test_path: test_1.json
 accuracy: 0.75
 classification_report: "              precision    recall  f1-score   support\n\n\
