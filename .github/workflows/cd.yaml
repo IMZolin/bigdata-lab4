@@ -10,23 +10,39 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Create .env file
+        run: |
+          echo "CLICKHOUSE_HOST=clickhouse" > .env
+          echo "CLICKHOUSE_PORT=8123" >> .env
+          echo "CLICKHOUSE_USER=model_user" >> .env
+          echo "CLICKHOUSE_PASSWORD=strongpassword" >> .env
+          echo "CLICKHOUSE_DATABASE=mydb" >> .env
       
       - name: Pull Docker image from DockerHub
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data:latest
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data2:latest
       
-      - name: Run Docker container
-        run: |
-          docker run -d -p 8000:8000 --name big-data ${{ secrets.DOCKERHUB_USERNAME }}/big-data:latest
-          sleep 10
+      - name: Start containers with docker compose
+        run: docker compose up -d
 
-      - name: Test inference endpoint
+      - name: Check the status of services
         run: |
+          echo "Waiting for services to be ready..."
+          sleep 10
+          HEALTH_RESPONSE=$(curl -s http://localhost:8000/health || true)
+          echo "status: $HEALTH_RESPONSE"
+          if [[ "$HEALTH_RESPONSE" == *"OK"* ]]; then
+            echo "API is ready!"
+            break
+          fi
+
+      - name: Run functional tests inside container
+        run: |
+          echo "Test 1: Prediction endpoint"
           RESPONSE=$(curl -s -X POST "http://localhost:8000/predict/" \
           -H "Content-Type: application/json" \
           -d '{"message": "I love this product!"}')
-          
           echo "Response: $RESPONSE"
-
           # Check if response contains expected sentiment
           if echo "$RESPONSE" | grep -q 'Positive sentiment\|Negative sentiment'; then
             echo "Inference successful"
@@ -34,6 +50,12 @@ jobs:
             echo "Invalid response"
             exit 1
           fi
+
+          echo "Test 2: Check if prediction was saved in database"
+          sleep 5
+          PREDICTIONS_RESPONSE=$(curl -s http://localhost:8000/predictions)
+          echo "Predictions response: $PREDICTIONS_RESPONSE"
+          PREDICTIONS_COUNT=$(echo "$PREDICTIONS_RESPONSE" | jq '.predictions | length')
 
       - name: Stop and remove container
         run: docker stop big-data && docker rm big-data

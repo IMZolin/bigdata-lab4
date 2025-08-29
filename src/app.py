@@ -53,6 +53,24 @@ class SentimentAPI:
             except Exception as e:
                 self.logger.error(f"Error in prediction: {e}")
                 raise HTTPException(status_code=500, detail="Prediction failed")
+            
+        @self.app.post("/predictions/")
+        async def get_predictions(limit: int = 10):
+            try:
+                self.logger.info(f"Fetching last {limit} predictions from DB")
+                rows = self.db_client.get_data("predictions", limit)
+                predictions = [
+                    {
+                        "timestamp": row[0].isoformat() if hasattr(row[0], "isoformat") else str(row[0]),
+                        "message": row[1],
+                        "prediction": row[2]
+                    }
+                    for row in rows
+                ]
+                return {"predictions": predictions}
+            except Exception as e:
+                self.logger.error(f"Error fetching predictions: {e}")
+                raise HTTPException(status_code=500, detail="Failed to fetch predictions")
 
         @self.app.get("/health/")
         async def health_check():
