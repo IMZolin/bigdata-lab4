@@ -10,7 +10,7 @@ docker-compose build
 docker-compose up web
 
 # Run the tests inside the test service
-docker-compose up test
+docker-compose up unit_test
 ```
 
 ### Example Request to the Web Service
