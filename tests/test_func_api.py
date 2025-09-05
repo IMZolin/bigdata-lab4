@@ -106,6 +106,13 @@ async def test_predictions_saved_in_db(db_client):
                 rows = db_client.get_data("predictions", limit=1)
                 last_row = rows[0]
                 log.info(f"Last DB row: {last_row}")
+            
+             # Fetch predictions from API
+            fetch_response = await client.post(f"{SERVER_URL}/predictions/", json={})
+            assert fetch_response.status_code == 200, f"Fetching predictions failed: {fetch_response.text}"
+            data = fetch_response.json()
+            fetched_predictions = data.get("predictions", [])
+            log.info(f"Fetched {len(fetched_predictions)} predictions from API")
 
             # Calculate functional metrics like in func_test
             y_true = np.array(y_true)

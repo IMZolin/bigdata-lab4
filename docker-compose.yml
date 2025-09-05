@@ -57,21 +57,6 @@ services:
       - CLICKHOUSE_USER=${CLICKHOUSE_USER}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
 
-  func_test:
-    image: zolin17/big-data-2:latest
-    depends_on:
-      - clickhouse
-    command: bash -c "
-      pytest tests/test_func_api.py -v -s"
-    volumes:
-      - .:/app
-    environment:
-      - PYTHONPATH=/app
-      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
-      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
-      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
-      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
 
 volumes:
   clickhouse_data:

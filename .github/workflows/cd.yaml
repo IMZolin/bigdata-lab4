@@ -25,37 +25,24 @@ jobs:
       - name: Start containers with docker compose
         run: docker compose up -d
 
-      - name: Check the status of services
+      - name: Wait for API
         run: |
-          echo "Waiting for services to be ready..."
-          sleep 10
-          HEALTH_RESPONSE=$(curl -s http://localhost:8000/health || true)
-          echo "status: $HEALTH_RESPONSE"
-          if [[ "$HEALTH_RESPONSE" == *"OK"* ]]; then
-            echo "API is ready!"
-            break
-          fi
-
-      - name: Run functional tests inside container
-        run: |
-          echo "Test 1: Prediction endpoint"
-          RESPONSE=$(curl -s -X POST "http://localhost:8000/predict/" \
-          -H "Content-Type: application/json" \
-          -d '{"message": "I love this product!"}')
-          echo "Response: $RESPONSE"
-          # Check if response contains expected sentiment
-          if echo "$RESPONSE" | grep -q 'Positive sentiment\|Negative sentiment'; then
-            echo "Inference successful"
-          else
-            echo "Invalid response"
+          for i in {1..10}; do
+            HEALTH_RESPONSE=$(curl -s http://localhost:8000/health || true)
+            if [[ "$HEALTH_RESPONSE" == *"OK"* ]]; then
+              echo "API is ready!"
+              break
+            fi
+            echo "Waiting..."
+            sleep 3
+          done
+          if [[ "$HEALTH_RESPONSE" != *"OK"* ]]; then
+            echo "API did not start"
             exit 1
           fi
 
-          echo "Test 2: Check if prediction was saved in database"
-          sleep 5
-          PREDICTIONS_RESPONSE=$(curl -s http://localhost:8000/predictions)
-          echo "Predictions response: $PREDICTIONS_RESPONSE"
-          PREDICTIONS_COUNT=$(echo "$PREDICTIONS_RESPONSE" | jq '.predictions | length')
+      - name: Run functional tests inside container
+        run: pytest tests/test_func_api.py -v -s
 
       - name: Stop and remove container
-        run: docker stop big-data-2 && docker rm big-data-2
+        run: docker compose down
