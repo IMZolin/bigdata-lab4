@@ -123,7 +123,7 @@ class Predictor():
 
     def func_test(self):
         try:
-            tests_path = os.path.join(os.getcwd(), "tests")
+            tests_path = os.path.join(os.getcwd(), "tests", "test_data")
             exp_path = os.path.join(os.getcwd(), "experiments")
             os.makedirs(exp_path, exist_ok=True)
 

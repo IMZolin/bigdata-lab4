@@ -29,3 +29,14 @@ Expected response:
   "sentiment": "Positive sentiment"
 }
 ```
+
+```
+curl -X GET http://localhost:8000/health/ -H "Content-Type: application/json"
+``` 
+
+Expected response:
+```
+{
+  "status": "OK"
+}
+```

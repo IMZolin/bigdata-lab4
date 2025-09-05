@@ -25,7 +25,7 @@ class ClickHouseClient:
             return True
         except Exception as e:
             self.logger.error(f"Error connecting to ClickHouse: {e}")
-            sys.exit(1)
+            raise RuntimeError(f"ClickHouse connection failed: {e}")
 
     def close(self):
         if self.client:
