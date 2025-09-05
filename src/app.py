@@ -18,12 +18,13 @@ class SentimentAPI:
         self.logger = Logger(show=True).get_logger(__name__)
         self.predictor = Predictor()
         load_dotenv()  # load .env file into environment variables
+        self.db_client = None
         self._setup_database()
         self._setup_routes()
 
     def _setup_database(self):
         host = os.getenv("CLICKHOUSE_HOST", "localhost")
-        port = int(os.getenv("CLICKHOUSE_PORT", 9000))
+        port = int(os.getenv("CLICKHOUSE_PORT", 8123))
         user = os.getenv("CLICKHOUSE_USER", "default")
         password = os.getenv("CLICKHOUSE_PASSWORD", "")
 

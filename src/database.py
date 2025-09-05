@@ -1,6 +1,7 @@
 import configparser
 import sys
 import os
+import time
 from src.logger import Logger
 import clickhouse_connect
 
@@ -14,18 +15,21 @@ class ClickHouseClient:
         self.client = None
 
     def connect(self):
-        try:
-            self.client = clickhouse_connect.get_client(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password
-            )
-            self.logger.info(f"Connected to ClickHouse at {self.host}:{self.port}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Error connecting to ClickHouse: {e}")
-            sys.exit(1)
+        for i in range(5):
+            try:
+                self.client = clickhouse_connect.get_client(
+                    host=self.host,
+                    port=self.port,
+                    user=self.user,
+                    password=self.password
+                )
+                self.logger.info(f"Connected to ClickHouse at {self.host}:{self.port}")
+                return True
+            except Exception as e:
+                self.logger.warning(f"Attempt {i+1}: Error connecting to ClickHouse: {e}")
+                time.sleep(3)
+        self.logger.error("Failed to connect to ClickHouse after 5 attempts")
+        sys.exit(1)
 
     def close(self):
         if self.client:
