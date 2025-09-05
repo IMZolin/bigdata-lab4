@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
-from src.predict import Predictor, parse_args
+from src.predict import Predictor
 from logger import Logger
 from src.database import ClickHouseClient  
 import configparser
@@ -13,11 +13,10 @@ class Message(BaseModel):
 
 
 class SentimentAPI:
-    def __init__(self, args=None):
+    def __init__(self):
         self.app = FastAPI()
         self.logger = Logger(show=True).get_logger(__name__)
         self.predictor = Predictor()
-        self.args = args or parse_args()
         load_dotenv()  # load .env file into environment variables
         self._setup_database()
         self._setup_routes()
@@ -81,8 +80,7 @@ class SentimentAPI:
 
 
 def main():
-    args = parse_args()
-    sentiment_api = SentimentAPI(args)
+    sentiment_api = SentimentAPI()
     sentiment_api.run()
 
 if __name__ == "__main__":
