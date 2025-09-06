@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   
   vault:
@@ -8,7 +6,7 @@ services:
     ports:
       - "8200:8200"
     volumes:
-      - vault-data:/vault/data
+      - vault_data:/vault/data
       - ./vault:/vault
     environment:
       - VAULT_ADDR=http://localhost:8200
@@ -51,7 +49,7 @@ services:
 
   web:
     build: .
-    image: zolin17/big-data-2:latest
+    image: zolin17/big-data-3:latest
     container_name: big-data
     depends_on:
       - clickhouse
