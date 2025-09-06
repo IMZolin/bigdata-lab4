@@ -4,6 +4,7 @@ import uvicorn
 from src.predict import Predictor
 from logger import Logger
 from src.database import ClickHouseClient  
+from src.vault import get_vault_client
 import configparser
 import os
 from dotenv import load_dotenv
@@ -19,15 +20,28 @@ class SentimentAPI:
         self.predictor = Predictor()
         load_dotenv()  # load .env file into environment variables
         self.db_client = None
+        self._setup_vault()
         self._setup_database()
         self._setup_routes()
 
-    def _setup_database(self):
-        host = os.getenv("CLICKHOUSE_HOST", "localhost")
-        port = int(os.getenv("CLICKHOUSE_PORT", 8123))
-        user = os.getenv("CLICKHOUSE_USER", "default")
-        password = os.getenv("CLICKHOUSE_PASSWORD", "")
+    def _setup_vault(self):
+        try:
+            self.vault_client = get_vault_client()
+            if self.vault_client and self.vault_client.is_authenticated():
+                self.vault_connected = True
+                self.logger.info("Vault client initialized successfully")
+            else:
+                self.vault_connected = False
+                self.logger.error("Failed to initialize Vault client")
+        except Exception as e:
+            self.logger.error(f"Failed to initialize Vault client: {e}")
+            self.vault_connected = False
 
+    def _setup_database(self):
+        host, port, user, password = self.vault_client.get_connection()
+        if not host or not port or not user or not password:
+            self.logger.error("Failed to get database connection from Vault")
+            raise RuntimeError("Failed to get database connection from Vault")
         self.db_client = ClickHouseClient(host, port, user, password)
         self.db_client.connect()
         self.db_client.create_table("predictions")
@@ -72,6 +86,22 @@ class SentimentAPI:
                 self.logger.error(f"Error fetching predictions: {e}")
                 raise HTTPException(status_code=500, detail="Failed to fetch predictions")
 
+        @self.app.get("/vault-status/")
+        async def vault_status():
+            if not self.vault_connected:
+                raise HTTPException(status_code=500, detail="Failed to connect to Vault")
+            try:
+                vault_status = {
+                    "connected": self.vault_connected,
+                    "authenticated": self.vault_client.is_authenticated() if self.vault_client else False,
+                    "secrets_engine": "Available" if self.vault_client and self.vault_client.sys.list_mounted_secrets_engines() else "Not available"
+                }
+                self.logger.info(f"Vault status: {vault_status}")
+                return vault_status
+            except Exception as e:
+                self.logger.error(f"Error getting Vault status: {e}")
+                raise HTTPException(status_code=500, detail="Failed to get Vault status")
+        
         @self.app.get("/health/")
         async def health_check():
             return {"status": "OK"}
