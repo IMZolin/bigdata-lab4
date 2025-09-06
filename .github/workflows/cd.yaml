@@ -18,9 +18,10 @@ jobs:
           echo "CLICKHOUSE_USER=model_user" >> .env
           echo "CLICKHOUSE_PASSWORD=strongpassword" >> .env
           echo "CLICKHOUSE_DATABASE=mydb" >> .env
+          echo "VAULT_ADDR=http://vault:8200" >> .env
       
       - name: Pull Docker image from DockerHub
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-2:latest
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-3:latest
       
       - name: Start containers with docker compose
         run: docker compose up -d
