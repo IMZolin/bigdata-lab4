@@ -131,7 +131,7 @@ class SentimentAPI:
                 vault_status = {
                     "connected": self.vault_connected,
                     "authenticated": self.vault_client.is_authenticated() if self.vault_client else False,
-                    "secrets_engine": "Available" if self.vault_client and self.vault_client.sys.list_mounted_secrets_engines() else "Not available"
+                    "secrets_engine": "Available" if self.vault_client.list_mounted_secrets_engines() else "Not available"
                 }
                 self.logger.info(f"Vault status: {vault_status}")
                 return vault_status
@@ -141,6 +141,17 @@ class SentimentAPI:
         
         @self.app.get("/health/")
         async def health_check():
+            status = {
+                "status": "healthy",
+                "model_loaded": getattr(self, "predictor", None) is not None,
+                "database_connected": getattr(self, "db_connected", False),
+                "vault_connected": getattr(self, "vault_connected", False),
+            }
+            self.logger.info(f"Health check: {status}")
+            return status
+
+        @self.app.get("/ready/")
+        async def readiness_check():
             return {"status": "OK"}
 
     def run(self):

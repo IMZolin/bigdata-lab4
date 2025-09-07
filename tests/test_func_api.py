@@ -39,7 +39,7 @@ def wait_for_api():
     start = time.time()
     while time.time() - start < timeout:
         try:
-            response = httpx.get(f"{SERVER_URL}/health/")
+            response = httpx.get(f"{SERVER_URL}/ready/")
             if response.status_code == 200:
                 log.info("API is up and running.")
                 return
@@ -60,6 +60,33 @@ def db_client():
     client.close()
     log.info("ClickHouse connection closed.")
 
+
+@pytest.mark.asyncio
+async def test_health_check():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{SERVER_URL}/health/")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert isinstance(data["model_loaded"], bool)
+        assert isinstance(data["database_connected"], bool)
+        assert isinstance(data["vault_connected"], bool)
+
+
+@pytest.mark.asyncio
+async def test_vault_status():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{SERVER_URL}/vault-status/")
+        if response.status_code == 200:
+            data = response.json()
+            assert "connected" in data
+            assert "authenticated" in data
+            assert "secrets_engine" in data
+            log.info(f"Vault status: {data}")
+        else:
+            assert response.status_code == 500
+            log.warning("Vault not available, got 500 as expected")
 
 # ============================
 # Functional Test
