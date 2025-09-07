@@ -42,21 +42,20 @@ def parse_args():
 class Predictor():
 
     def __init__(self, config_path="config.ini", args=None) -> None:
-        logger = Logger(SHOW_LOG)
         self.config_path = config_path
         self.config = configparser.ConfigParser()
-        self.log = logger.get_logger(__name__)
+        self.logger = Logger(show=SHOW_LOG).get_logger(__name__)
         self.config.read(config_path)
         self.args = args if args is not None else argparse.Namespace(tests="smoke")
-        self.log.info("Predictor is ready")
+        self.logger.info("Predictor is ready")
         try:
             self.X_test = np.load(self.config["SPLIT_DATA"]["X_test"])
             self.y_test = np.load(self.config["SPLIT_DATA"]["y_test"])
         except FileNotFoundError:    
-            self.log.error("File missing.")
+            self.logger.error("File missing.")
             raise HTTPException(status_code=404, detail="File missing")
         except Exception as e:
-            self.log.error(f"Numpy array load failure: {e}")
+            self.logger.error(f"Numpy array load failure: {e}")
             raise HTTPException(status_code=500, detail="Numpy array load failure")
         try:
             with open(self.config["NAIVE_BAYES"]["path"], "rb") as model_file:
@@ -64,17 +63,17 @@ class Predictor():
             with open(self.config["SPLIT_DATA"]["vectorizer"], "rb") as vectorizer_file:
                 self.vectorizer = pickle.load(vectorizer_file)
         except FileNotFoundError:
-            self.log.error("Model file not found.")
+            self.logger.error("Model file not found.")
             raise HTTPException(status_code=404, detail="Model not found")
         except Exception as e:
-            self.log.error(f"Error loading model/vectorizer: {e}")
+            self.logger.error(f"Error loading model/vectorizer: {e}")
             raise HTTPException(status_code=500, detail="Internal server error")
 
 
     def predict(self, message) -> str:
         try:
             if not message:
-                self.log.error("Message is not provided")
+                self.logger.error("Message is not provided")
                 raise HTTPException(
                     status_code=400, 
                     detail="Message is not provided. Please provide a message to analyze."
@@ -83,18 +82,18 @@ class Predictor():
             message_vectorized = self.vectorizer.transform([cleaned_message])  
             sentiment = self.classifier.predict(message_vectorized)
             if sentiment[0] == 1:
-                self.log.info(f"Sentiment for message: '{message}' is Positive")
+                self.logger.info(f"Sentiment for message: '{message}' is Positive")
                 return "Positive sentiment"
             elif sentiment[0] == 0:
-                self.log.info(f"Sentiment for message: '{message}' is Negative")
+                self.logger.info(f"Sentiment for message: '{message}' is Negative")
                 return "Negative sentiment"
             else:
-                self.log.error(f"Unexpected sentiment value: {sentiment[0]}")
+                self.logger.error(f"Unexpected sentiment value: {sentiment[0]}")
                 return "Unknown sentiment"
         except HTTPException:
             raise
         except Exception as e:
-            self.log.error(f"Error during prediction: {e}")
+            self.logger.error(f"Error during prediction: {e}")
             raise HTTPException(
                 status_code=500, 
                 detail=f"Prediction error: {e}"
@@ -106,7 +105,7 @@ class Predictor():
         elif self.args.tests == "func":
             self.func_test()
         else:
-            self.log.error("Unknown test type")
+            self.logger.error("Unknown test type")
             raise HTTPException(status_code=400, detail="Unknown test type")
         return True
         
@@ -115,11 +114,11 @@ class Predictor():
             print(self.y_test.shape, self.X_test.shape)
             y_pred = self.classifier.predict(self.X_test)
             accuracy = accuracy_score(self.y_test, y_pred)
-            self.log.info(f'Model has {accuracy} Accuracy score')
+            self.logger.info(f'Model has {accuracy} Accuracy score')
         except Exception:
-            self.log.error(traceback.format_exc())
+            self.logger.error(traceback.format_exc())
             sys.exit(1)
-        self.log.info(f'Model passed smoke tests')
+        self.logger.info(f'Model passed smoke tests')
 
     def func_test(self):
         try:
@@ -177,16 +176,15 @@ class Predictor():
                     if os.path.exists(log_file):
                         shutil.copy(log_file, os.path.join(exp_dir, "exp_logfile.log"))
 
-                    self.log.info(f'Model passed func test {test_file}')
+                    self.logger.info(f'Model passed func test {test_file}')
 
                 except Exception:
-                    self.log.error(traceback.format_exc())
+                    self.logger.error(traceback.format_exc())
                     sys.exit(1)
 
         except Exception as e:
-            self.log.error(f"Error during test: {e}")
+            self.logger.error(f"Error during test: {e}")
             raise HTTPException(status_code=500, detail="Test error")
-
 
 
 if __name__ == "__main__":

@@ -16,8 +16,7 @@ SHOW_LOG = True
 
 class DataMaker:
     def __init__(self, config_path="config.ini", project_path=None) -> None:
-        self.logger = Logger(SHOW_LOG)
-        self.log = self.logger.get_logger(__name__)
+        self.logger = Logger(show=SHOW_LOG).get_logger(__name__)
         self.config_path = config_path
         self.config = configparser.ConfigParser()
         self.config.read(self.config_path)
@@ -39,11 +38,11 @@ class DataMaker:
         ]
         self.vectorizer_path = os.path.join(self.project_path, "vectorizer.pkl")
         self.vectorizer = TfidfVectorizer(max_features=5000, stop_words="english")
-        self.log.info("DataMaker is ready")
+        self.logger.info("DataMaker is ready")
 
     def split_data(self, test_size=TEST_SIZE) -> bool:
         if not os.path.isfile(self.data_path):
-            self.log.error(f"Training data file {self.data_path} not found!")
+            self.logger.error(f"Training data file {self.data_path} not found!")
             return False
         dataset = pd.read_csv(self.data_path, encoding="ISO-8859-1")
         dataset["SentimentText"] = dataset["SentimentText"].astype(str).apply(clean_text)
@@ -76,14 +75,14 @@ class DataMaker:
             "y_test": rel_test_y,
             "vectorizer": rel_vectorizer,
         }
-        self.log.info("Train and test data is ready")
+        self.logger.info("Train and test data is ready")
         with open(self.config_path, "w") as configfile:
             self.config.write(configfile)
         return all(os.path.isfile(path) for path in self.train_path + self.test_path)
 
     def save_splitted_data(self, df: np.ndarray, path: str) -> bool:
         np.save(path, df)  
-        self.log.info(f"{path} is saved")
+        self.logger.info(f"{path} is saved")
         return os.path.isfile(path)
     
 

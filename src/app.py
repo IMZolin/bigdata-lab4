@@ -20,6 +20,8 @@ class SentimentAPI:
         self.predictor = Predictor()
         load_dotenv()  # load .env file into environment variables
         self.db_client = None
+        self.vault_client = None
+        self.vault_connected = False
         self._setup_vault()
         self._setup_database()
         self._setup_routes()
@@ -38,13 +40,46 @@ class SentimentAPI:
             self.vault_connected = False
 
     def _setup_database(self):
-        host, port, user, password = self.vault_client.get_connection()
-        if not host or not port or not user or not password:
-            self.logger.error("Failed to get database connection from Vault")
-            raise RuntimeError("Failed to get database connection from Vault")
-        self.db_client = ClickHouseClient(host, port, user, password)
-        self.db_client.connect()
-        self.db_client.create_table("predictions")
+        max_db_connection_attempts = 5
+        self.db_connected = False
+
+        for attempt in range(max_db_connection_attempts):
+            try:
+                if not self.vault_client:
+                    self.logger.warning("Vault client is not available, falling back to env vars")
+                host, port, user, password = self.vault_client.get_connection()
+                self.db_client = ClickHouseClient(host, port, user, password)
+                self.db_client.connect()
+                self.db_client.create_table("predictions")
+                self.db_connected = True
+                self.logger.info("Database setup completed successfully")
+                break
+            except Exception as e:
+                self.logger.error(
+                    f"Failed to create database tables (attempt {attempt + 1} of {max_db_connection_attempts}): {e}"
+                )
+                time.sleep(3)
+        if not self.db_connected:
+            self.logger.warning(f"Failed to connect to database after {max_db_connection_attempts} attempts")
+            self.logger.warning("Continuing without database support")
+
+    def _setup_database(self):
+        max_db_connection_attempts = 5
+        self.db_connected = False
+        try:
+            host, port, user, password = self.vault_client.get_connection()
+            if not host or not port or not user or not password:
+                self.logger.error("Failed to get database connection from Vault")
+                raise RuntimeError("Failed to get database connection from Vault")
+            self.db_client = ClickHouseClient(host, port, user, password)
+            self.db_client.connect()
+            self.db_client.create_table("predictions")
+            self.db_connected = True
+        except Exception as e:
+            self.logger.error(f"Failed to create database tables (attempt {attempt + 1}): {e}")
+        if not self.db_connected:
+            self.logger.warning(f"Failed to connect to database after {max_db_connection_attempts} attempts")
+            self.logger.warning("Continuing without database support")
 
     def _setup_routes(self):
         @self.app.post("/predict/")
@@ -71,6 +106,8 @@ class SentimentAPI:
         @self.app.post("/predictions/")
         async def get_predictions(limit: int = 10):
             try:
+                if not self.db_connected:
+                    raise HTTPException(status_code=503, detail="Database not available")
                 self.logger.info(f"Fetching last {limit} predictions from DB")
                 rows = self.db_client.get_data("predictions", limit)
                 predictions = [

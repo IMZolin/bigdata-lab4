@@ -1,9 +1,9 @@
 import os
 import hvac
-import logging
-from src.utils import load_config
-logger = logging.getLogger(__name__)
+import configparser
+from src.logger import Logger
 
+SHOW_LOG = True
 
 class VaultClient:
     """
@@ -11,7 +11,7 @@ class VaultClient:
     Handles authentication and secret retrieval.
     """
 
-    def __init__(self, addr=None, token=None, token_path="/vault/data/app_token.txt"):
+    def __init__(self, addr=None, token=None, token_path="/vault/data/app_token.txt", config_path="config.ini"):
         """
         Args:
             addr (str): Vault server address. Defaults to env VAULT_ADDR or http://vault:8200
@@ -20,23 +20,27 @@ class VaultClient:
         """
         self.addr = addr or os.environ.get("VAULT_ADDR", "http://vault:8200")
         self.token = token or os.environ.get("VAULT_TOKEN", None)
+        self.logger = Logger(show=SHOW_LOG).get_logger(__name__)
+        self.config = configparser.ConfigParser()
+        self.config_path = config_path
+        self.config.read(config_path)
 
         if not self.token and os.path.exists(token_path):
             try:
                 with open(token_path, "r") as f:
                     self.token = f.read().strip()
-                    logger.info(f"Loaded Vault token from {token_path}")
+                    self.logger.info(f"Loaded Vault token from {token_path}")
             except Exception as e:
-                logger.warning(f"Failed to read token from {token_path}: {e}")
+                self.logger.warning(f"Failed to read token from {token_path}: {e}")
 
         if not self.token:
-            logger.warning("No Vault token provided, falling back to 'root' (for testing only).")
+            self.logger.warning("No Vault token provided, falling back to 'root' (for testing only).")
             self.token = "root"
-        logger.info(f"Connecting to Vault at {self.addr}")
+        self.logger.info(f"Connecting to Vault at {self.addr}")
         self.client = hvac.Client(url=self.addr, token=self.token)
         if not self.client.is_authenticated():
             raise RuntimeError("Failed to authenticate with Vault")
-        logger.info("Vault client successfully authenticated")
+        self.logger.info("Vault client successfully authenticated")
 
     def get_client(self):
         """Return the underlying hvac.Client"""
@@ -60,30 +64,35 @@ class VaultClient:
             )
             return response.get("data", {}).get("data")
         except Exception as e:
-            logger.error(f"Error retrieving database credentials from Vault: {e}")
+            self.logger.error(f"Error retrieving database credentials from Vault: {e}")
             return None
+
+    def is_authenticated(self):
+        return self.client and self.client.is_authenticated()
     
     def get_connection(self):
         """
         Get the connection to the Vault server.
         """
-        config = load_config("src/config.ini")
-        db_config = config["DATABASE"] if "DATABASE" in config else {}
-        vault_credentials = self.get_db_credentials(db_config["path"])
+        db_config = self.config["DATABASE"] if "DATABASE" in self.config else {}
+        path = db_config.get("path", "database/credentials")
+        mount_point = db_config.get("mount_point", "kv")
+        self.logger.info(f"Fetching Vault credentials from path='{path}', mount_point='{mount_point}'")
+        vault_credentials = self.get_db_credentials(path=path, mount_point=mount_point)
         if vault_credentials:
-            host = vault_credentials.get("host", "localhost")
-            port = int(vault_credentials.get("port", "8123"))
-            user = vault_credentials.get("username", "default")
-            password = vault_credentials.get("password", "")
-            logger.info("Using database credentials from Vault")
+            host = vault_credentials.get("host", db_config.get("host", "clickhouse"))
+            port = int(vault_credentials.get("port", db_config.get("port", "8123")))
+            user = vault_credentials.get("username", db_config.get("user", "default"))
+            password = vault_credentials.get("password", db_config.get("password", ""))
+            self.logger.info("Using database credentials from Vault")
+            self.logger.info(f"{host}, {port}, {user}, {password}")
         else:
             # Fall back to environment variables
-            logger.error("No database credentials found in Vault")
-            host = os.environ.get("CLICKHOUSE_HOST", db_config.get("host", "localhost"))
-            port = int(os.environ.get("CLICKHOUSE_PORT", "8123"))
-            user = os.environ.get("CLICKHOUSE_USER", "default")
-            password = os.environ.get("CLICKHOUSE_PASSWORD", "")
-            logger.info("Using database credentials from environment variables")
+            host = os.environ.get("CLICKHOUSE_HOST", db_config.get("host", "clickhouse"))
+            port = int(os.environ.get("CLICKHOUSE_PORT", db_config.get("port", "8123")))
+            user = os.environ.get("CLICKHOUSE_USER", db_config.get("user", "default"))
+            password = os.environ.get("CLICKHOUSE_PASSWORD", db_config.get("password", ""))
+            self.logger.info("Using database credentials from environment variables")
         return host, port, user, password
 
 
@@ -91,6 +100,7 @@ class VaultClient:
 _vault_client = None
 
 def get_vault_client():
+    logger = Logger(show=SHOW_LOG).get_logger(__name__)
     global _vault_client
     if _vault_client is None:
         try:

@@ -4,7 +4,7 @@
 sleep 5
 
 # Set Vault address
-export VAULT_ADDR='http://127.0.0.1:8200'
+export VAULT_ADDR='http://vault:8200'
 
 # Check if Vault is already initialized
 INIT_STATUS=$(vault status -format=json 2>/dev/null | jq -r '.initialized')

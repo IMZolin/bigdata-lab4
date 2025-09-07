@@ -9,16 +9,14 @@ services:
       - vault_data:/vault/data
       - ./vault:/vault
     environment:
-      - VAULT_ADDR=http://localhost:8200
+      - VAULT_ADDR=http://0.0.0.0:8200
       - VAULT_TOKEN=root
-      - VAULT_CLUSTER_ADDR=http://vault:8201
-      - VAULT_CLUSTER_TOKEN=root
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
       - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
       - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
-    command: bash -c "apk add --no-cache jq && /vault/start.sh"
+    command: sh -c "apk add --no-cache jq && /vault/start.sh"
     healthcheck:
       test: ["CMD", "vault", "status"]
       interval: 10s
@@ -26,6 +24,8 @@ services:
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    networks:
+      - backend
   
   clickhouse:
     image: clickhouse/clickhouse-server:latest
@@ -37,15 +37,17 @@ services:
       - clickhouse_data:/var/lib/clickhouse
     environment:
       - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
-      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
-      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
       - CLICKHOUSE_USER=${CLICKHOUSE_USER}
       - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
       - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
-      - VAULT_ADDR=http://vault:8200
-      - VAULT_TOKEN=root
-      - VAULT_CLUSTER_ADDR=http://vault:8201
-      - VAULT_CLUSTER_TOKEN=root
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
 
   web:
     build: .
@@ -73,7 +75,13 @@ services:
       - VAULT_ADDR=http://vault:8200
       - VAULT_TOKEN=root
     restart: on-failure
+    networks:
+      - backend
 
 volumes:
   clickhouse_data:
   vault_data:
+
+networks:
+  backend:
+    driver: bridge
