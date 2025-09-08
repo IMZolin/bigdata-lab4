@@ -69,9 +69,9 @@ class VaultClient:
 
     def is_authenticated(self):
         return self.client and self.client.is_authenticated()
-    
-    def list_mounted_secrets_engines():
-        return self.client and self.client.sys.list_mounted_secrets_engines() 
+
+    def list_mounted_secrets_engines(self):
+        return self.client and self.client.sys.list_mounted_secrets_engines()
     
     def get_connection(self):
         """

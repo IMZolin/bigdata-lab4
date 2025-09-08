@@ -31,7 +31,7 @@ Expected response:
 ```
 
 ```
-curl -X GET http://localhost:8000/health/ -H "Content-Type: application/json"
+curl -X GET http://localhost:8000/ready/ -H "Content-Type: application/json"
 ``` 
 
 Expected response:

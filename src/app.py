@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
+import time
 from src.predict import Predictor
 from logger import Logger
 from src.database import ClickHouseClient  
@@ -59,24 +60,6 @@ class SentimentAPI:
                     f"Failed to create database tables (attempt {attempt + 1} of {max_db_connection_attempts}): {e}"
                 )
                 time.sleep(3)
-        if not self.db_connected:
-            self.logger.warning(f"Failed to connect to database after {max_db_connection_attempts} attempts")
-            self.logger.warning("Continuing without database support")
-
-    def _setup_database(self):
-        max_db_connection_attempts = 5
-        self.db_connected = False
-        try:
-            host, port, user, password = self.vault_client.get_connection()
-            if not host or not port or not user or not password:
-                self.logger.error("Failed to get database connection from Vault")
-                raise RuntimeError("Failed to get database connection from Vault")
-            self.db_client = ClickHouseClient(host, port, user, password)
-            self.db_client.connect()
-            self.db_client.create_table("predictions")
-            self.db_connected = True
-        except Exception as e:
-            self.logger.error(f"Failed to create database tables (attempt {attempt + 1}): {e}")
         if not self.db_connected:
             self.logger.warning(f"Failed to connect to database after {max_db_connection_attempts} attempts")
             self.logger.warning("Continuing without database support")
