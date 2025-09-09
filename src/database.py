@@ -5,10 +5,12 @@ import time
 from src.logger import Logger
 import clickhouse_connect
 
+SHOW_LOG = True
+
 
 class ClickHouseClient:
     def __init__(self, host: str, port: int, user: str, password: str):
-        self.logger = Logger(show=True).get_logger(__name__)
+        self.logger = Logger(show=SHOW_LOG).get_logger(__name__)
         self.host = host
         self.port = port
         self.user = user

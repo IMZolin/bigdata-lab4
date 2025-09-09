@@ -2,6 +2,7 @@ import os
 import hvac
 import configparser
 from src.logger import Logger
+from src.database import ClickHouseClient
 
 SHOW_LOG = True
 
@@ -97,6 +98,27 @@ class VaultClient:
             password = os.environ.get("CLICKHOUSE_PASSWORD", db_config.get("password", ""))
             self.logger.info("Using database credentials from environment variables")
         return host, port, user, password
+
+    def setup_database(self, table_name="predictions", max_attempts=5):
+        """
+        Setup ClickHouse client using credentials from Vault.
+        Returns:
+            ClickHouseClient object if successful, else None.
+        """
+        for attempt in range(max_attempts):
+            try:
+                host, port, user, password = self.get_connection()
+                db_client = ClickHouseClient(host, port, user, password)
+                db_client.connect()
+                db_client.create_table(table_name)
+                self.logger.info(f"Database setup completed successfully (table: {table_name})")
+                return db_client
+            except Exception as e:
+                self.logger.error(f"Database setup failed (attempt {attempt+1}/{max_attempts}): {e}")
+                time.sleep(3)
+        self.logger.warning(f"Failed to setup database after {max_attempts} attempts")
+        return None
+
 
 
 # Singleton helper
