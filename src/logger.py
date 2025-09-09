@@ -3,30 +3,28 @@ import os
 import sys
 
 FORMATTER = logging.Formatter(
-    "%(asctime)s — %(name)s — %(levelname)s — %(message)s")
+    "%(asctime)s — %(name)s — %(levelname)s — %(message)s"
+)
 LOG_FILE = os.path.join(os.getcwd(), "logfile.log")
 
 
 class Logger:
     """
-        Class for logging behaviour of data exporting - object of ExportingTool class
+    Class for logging behaviour of data exporting - object of ExportingTool class
     """
 
-    def __init__(self, show: bool) -> None:
+    def __init__(self, show: bool = True) -> None:
         """
-            Re-defined __init__ method which sets show parametr
+        Re-defined __init__ method which sets show parameter
 
         Args:
-            show (bool): if set all logs will be shown in terminal
+            show (bool): if set, all logs will be shown in terminal
         """
         self.show = show
 
     def get_console_handler(self) -> logging.StreamHandler:
         """
-            Class method the aim of which is getting a console handler to show logs on terminal
-
-        Returns:
-            logging.StreamHandler: handler object for streaming output through terminal
+        Create a console handler to show logs in the terminal
         """
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(FORMATTER)
@@ -34,29 +32,30 @@ class Logger:
 
     def get_file_handler(self) -> logging.FileHandler:
         """
-            Class method the aim of which is getting a file handler to write logs in file LOG_FILE
-
-        Returns:
-            logging.FileHandler: handler object for streaming output through std::filestream
+        Create a file handler to write logs to logfile.log
         """
         file_handler = logging.FileHandler(LOG_FILE, mode='w')
         file_handler.setFormatter(FORMATTER)
         return file_handler
 
-    def get_logger(self, logger_name: str):
+    def get_logger(self, logger_name: str) -> logging.Logger:
         """
-            Class method which creates logger with certain name
+        Create logger with a given name
 
         Args:
             logger_name (str): name for logger
 
         Returns:
-            logger: object of Logger class
+            logging.Logger: configured logger
         """
         logger = logging.getLogger(logger_name)
         logger.setLevel(logging.DEBUG)
-        if self.show:
-            logger.addHandler(self.get_console_handler())
-        logger.addHandler(self.get_file_handler())
+
+        # Avoid duplicate handlers
+        if not logger.handlers:
+            if self.show:
+                logger.addHandler(self.get_console_handler())
+            logger.addHandler(self.get_file_handler())
+
         logger.propagate = False
         return logger

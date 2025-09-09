@@ -18,7 +18,7 @@ services:
     restart: unless-stopped
 
   kafka:
-    image:  confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:latest
     container_name: kafka
     ports:
       - "9092:9092"
@@ -28,18 +28,13 @@ services:
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTIONS_TOPIC_REPLICATION_FACTOR: 1
-    healthcheck:
-      test: ["CMD", "bash", "-lc", "kafka-broker-api-versions --bootstrap-server kafka:9092 >/dev/null 2>&1 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      KAFKA_PROCESS_ROLES: "broker"
     depends_on:
       - zookeeper
     networks:
       - backend
     restart: unless-stopped
+
   
   vault:
     image: hashicorp/vault:latest
@@ -92,7 +87,7 @@ services:
   web:
     build: .
     image: zolin17/big-data-4:latest
-    container_name: big-data
+    container_name: big-data-4
     depends_on:
       - clickhouse
       - vault
@@ -123,8 +118,7 @@ services:
       - backend
 
   consumer:
-    build: .
-    image: zolin17/big-data-consumer:latest
+    image: zolin17/big-data-4:latest
     container_name: big-data-consumer
     depends_on:
       - kafka

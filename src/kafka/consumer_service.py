@@ -10,7 +10,7 @@ logger = Logger(show=SHOW_LOG).get_logger(__name__)
 
 
 def main():
-    consumer = Consumer(db_client=db_client)
+    consumer = Consumer()
 
     def _signal_handler(sig, frame):
         logger.info("Received signal %s, stopping consumer...", sig)

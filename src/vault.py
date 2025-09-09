@@ -49,21 +49,31 @@ class VaultClient:
 
     def get_db_credentials(self, path="database/credentials", mount_point="kv"):
         """
-        Retrieve database credentials from Vault KV v2.
-
-        Args:
-            path (str): Path to the secret in Vault.
-            mount_point (str): KV engine mount point.
-        
-        Returns:
-            dict | None: Secret data or None if not found.
+        Retrieve database credentials from Vault. Supports KV v1 or v2.
         """
         try:
-            response = self.client.secrets.kv.v2.read_secret_version(
-                path=path,
-                mount_point=mount_point
-            )
-            return response.get("data", {}).get("data")
+            # Try KV v2 first
+            try:
+                response = self.client.secrets.kv.v2.read_secret_version(
+                    path=path,
+                    mount_point=mount_point
+                )
+                data = response.get("data", {}).get("data")
+                if data:
+                    return data
+            except hvac.exceptions.InvalidPath:
+                self.logger.info("KV v2 path not found, trying KV v1...")
+
+            # Fallback to KV v1
+            try:
+                response = self.client.secrets.kv.v1.read_secret(path=path)
+                data = response.get("data")
+                if data:
+                    return data
+            except hvac.exceptions.InvalidPath:
+                self.logger.warning(f"No secret found at {mount_point}/{path}")
+                return None
+
         except Exception as e:
             self.logger.error(f"Error retrieving database credentials from Vault: {e}")
             return None

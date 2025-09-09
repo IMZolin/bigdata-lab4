@@ -1,7 +1,8 @@
 import os
 import tempfile
+import time
 import unittest
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 
 from src.vault import VaultClient, get_vault_client
 
@@ -115,6 +116,53 @@ class TestVaultClient(unittest.TestCase):
         c1 = get_vault_client()
         c2 = get_vault_client()
         self.assertIs(c1, c2)
+
+    @patch("time.sleep", return_value=None)
+    @patch("src.vault.hvac.Client")
+    @patch("src.database.ClickHouseClient")
+    @patch.object(VaultClient, "get_connection")
+    @patch("sys.exit")
+    def test_setup_database_success(
+        self,
+        mock_exit,
+        mock_get_conn,
+        mock_clickhouse_class,
+        mock_hvac_client,
+        mock_sleep
+    ):
+        mock_hvac_instance = mock_hvac_client.return_value
+        mock_hvac_instance.is_authenticated.return_value = True
+        mock_get_conn.return_value = ("clickhouse", 8123, "user", "pw")
+        mock_db_instance = mock_clickhouse_class.return_value
+        mock_db_instance.connect.return_value = True
+        mock_db_instance.create_table.return_value = True
+
+        client = VaultClient(token="t")
+        db_client = client.setup_database(table_name="preds", max_attempts=1)
+        self.assertIsNotNone(db_client)
+        mock_clickhouse_class.assert_called_once_with("clickhouse", 8123, "user", "pw")
+        mock_db_instance.connect.assert_called_once()
+        mock_db_instance.create_table.assert_called_once_with("preds")
+        mock_exit.assert_not_called()
+
+    @patch.object(VaultClient, "get_connection")
+    @patch("src.database.ClickHouseClient")
+    @patch("src.vault.hvac.Client")
+    @patch("time.sleep", return_value=None)
+    def test_setup_database_success(self, mock_sleep, mock_hvac_client, mock_clickhouse_class, mock_get_conn):
+        mock_hvac_instance = mock_hvac_client.return_value
+        mock_hvac_instance.is_authenticated.return_value = True
+        mock_get_conn.return_value = ("clickhouse", 8123, "user", "pw")
+        mock_db_instance = mock_clickhouse_class.return_value
+        mock_db_instance.connect.return_value = True
+        mock_db_instance.create_table.return_value = True
+
+        client = VaultClient(token="t")
+        db_client = client.setup_database(table_name="preds", max_attempts=1)
+        self.assertIsNotNone(db_client)
+        mock_clickhouse_class.assert_called_once_with("clickhouse", 8123, "user", "pw")
+        mock_db_instance.connect.assert_called_once()
+        mock_db_instance.create_table.assert_called_once_with("preds")
 
 
 if __name__ == "__main__":

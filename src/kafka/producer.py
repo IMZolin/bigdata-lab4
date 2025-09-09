@@ -22,7 +22,7 @@ class Producer:
             acks="all"
         )
         
-    def send(self, payload: dict, key: str = None, ):
+    def send(self, payload: dict, key: str = None):
         """Send payload to configured topic. payload must be JSON-serializable."""
         for attempt in range(1, self.retries + 1):
             try:

@@ -28,7 +28,7 @@ jobs:
         run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-4:latest
       
       - name: Start containers with docker compose
-        run: docker compose up -d
+        run: docker-compose up --build -d
 
       - name: Wait for API
         run: |

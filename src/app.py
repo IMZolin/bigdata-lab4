@@ -9,6 +9,7 @@ from src.vault import get_vault_client
 from src.kafka.producer import Producer
 import configparser
 import os
+from kafka.errors import NoBrokersAvailable
 from dotenv import load_dotenv
 
 SHOW_LOG = True
@@ -28,7 +29,8 @@ class SentimentAPI:
         self.vault_connected = False
         self.vault_client = None
         self._setup_vault() 
-        self.kafka_connected = self.producer is not None
+        self.kafka_connected = False
+        self._setup_kafka_producer()
         self.db_client = self.vault_client.setup_database("predictions")
         self.db_connected = self.db_client is not None
         self._setup_routes()
@@ -45,6 +47,19 @@ class SentimentAPI:
         except Exception as e:
             self.logger.error(f"Failed to initialize Vault client: {e}")
             self.vault_connected = False
+
+    def _setup_kafka_producer(self, retries=5, delay=5):
+        for attempt in range(1, retries + 1):
+            try:
+                self.producer = Producer()
+                self.kafka_connected = True
+                self.logger.info("Kafka producer connected successfully")
+                return
+            except NoBrokersAvailable as e:
+                self.logger.warning(f"Kafka not available (attempt {attempt}/{retries}): {e}")
+                time.sleep(delay)
+        self.kafka_connected = False
+        self.logger.error("Failed to connect to Kafka after retries")
 
     def _setup_routes(self):
         @self.app.post("/predict/")
