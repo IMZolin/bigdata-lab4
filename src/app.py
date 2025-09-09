@@ -136,8 +136,7 @@ class SentimentAPI:
                 }
                 self.logger.info(f"Kafka status: {status}")
                 return status
-            except:
-                except Exception as e:
+            except Exception as e:
                 logger.error(f"Error checking Kafka status: {e}")
                 raise HTTPException(status_code=503, detail=f"Kafka connection error: {str(e)}")
             

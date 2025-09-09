@@ -18,10 +18,14 @@ jobs:
           echo "CLICKHOUSE_USER=model_user" >> .env
           echo "CLICKHOUSE_PASSWORD=strongpassword" >> .env
           echo "CLICKHOUSE_DATABASE=mydb" >> .env
+          echo "VAULT_TOKEN=root" >> .env
           echo "VAULT_ADDR=http://vault:8200" >> .env
+          echo "KAFKA_BOOTSTRAP_SERVERS=kafka:9092" >> .env
+          echo "KAFKA_TOPIC=predictions" >> .env
+          echo "KAFKA_GROUP=http://vault:8200" >> .env
       
       - name: Pull Docker image from DockerHub
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-3:latest
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-4:latest
       
       - name: Start containers with docker compose
         run: docker compose up -d
