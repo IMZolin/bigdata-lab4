@@ -1,10 +1,61 @@
-version: '3.8'
-
 services:
+  
+  vault:
+    image: hashicorp/vault:latest
+    container_name: vault
+    ports:
+      - "8200:8200"
+    volumes:
+      - vault_data:/vault/data
+      - ./vault:/vault
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_TOKEN=root
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+    command: sh -c "apk add --no-cache jq && /vault/start.sh"
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - backend
+  
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    environment:
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+
+
   web:
     build: .
-    image: zolin17/big-data:latest
+    image: zolin17/big-data-3:latest
     container_name: big-data
+    depends_on:
+      - clickhouse
+      - vault
     command: bash -c "
       python src/preprocess.py &&
       python src/train.py &&
@@ -16,16 +67,21 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - PYTHONPATH=/app
+      - CLICKHOUSE_DATABASE=${CLICKHOUSE_DATABASE}
+      - CLICKHOUSE_HOST=${CLICKHOUSE_HOST}
+      - CLICKHOUSE_PORT=${CLICKHOUSE_PORT}
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - VAULT_ADDR=http://vault:8200
+      - VAULT_TOKEN=root
+    restart: on-failure
+    networks:
+      - backend
 
-  test:
-    image: zolin17/big-data:latest
-    command: bash -c "
-      python src/preprocess.py &&
-      python src/train.py &&
-      python src/predict.py -t func &&
-      coverage run -m unittest &&
-      coverage report -m"
-    volumes:
-      - .:/app
-    environment:
-      - PYTHONPATH=/app
+volumes:
+  clickhouse_data:
+  vault_data:
+
+networks:
+  backend:
+    driver: bridge

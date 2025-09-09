@@ -10,30 +10,40 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Create .env file
+        run: |
+          echo "CLICKHOUSE_HOST=clickhouse" > .env
+          echo "CLICKHOUSE_PORT=8123" >> .env
+          echo "CLICKHOUSE_USER=model_user" >> .env
+          echo "CLICKHOUSE_PASSWORD=strongpassword" >> .env
+          echo "CLICKHOUSE_DATABASE=mydb" >> .env
+          echo "VAULT_ADDR=http://vault:8200" >> .env
       
       - name: Pull Docker image from DockerHub
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data:latest
+        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/big-data-3:latest
       
-      - name: Run Docker container
-        run: |
-          docker run -d -p 8000:8000 --name big-data ${{ secrets.DOCKERHUB_USERNAME }}/big-data:latest
-          sleep 10
+      - name: Start containers with docker compose
+        run: docker compose up -d
 
-      - name: Test inference endpoint
+      - name: Wait for API
         run: |
-          RESPONSE=$(curl -s -X POST "http://localhost:8000/predict/" \
-          -H "Content-Type: application/json" \
-          -d '{"message": "I love this product!"}')
-          
-          echo "Response: $RESPONSE"
-
-          # Check if response contains expected sentiment
-          if echo "$RESPONSE" | grep -q 'Positive sentiment\|Negative sentiment'; then
-            echo "Inference successful"
-          else
-            echo "Invalid response"
+          for i in {1..10}; do
+            HEALTH_RESPONSE=$(curl -s http://localhost:8000/ready || true)
+            if [[ "$HEALTH_RESPONSE" == *"OK"* ]]; then
+              echo "API is ready!"
+              break
+            fi
+            echo "Waiting..."
+            sleep 3
+          done
+          if [[ "$HEALTH_RESPONSE" != *"OK"* ]]; then
+            echo "API did not start"
             exit 1
           fi
 
+      - name: Run functional tests inside container
+        run: pytest tests/test_func_api.py -v -s
+
       - name: Stop and remove container
-        run: docker stop big-data && docker rm big-data
+        run: docker compose down

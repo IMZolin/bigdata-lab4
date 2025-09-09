@@ -5,29 +5,28 @@ import numpy as np
 import glob
 from unittest import mock
 import sys
+import tempfile
+import shutil
 from src.logger import Logger
 from src.train import Trainer
 
 sys.path.insert(1, os.path.join(os.getcwd(), "src"))
 
-config = configparser.ConfigParser()
-config.read("config.ini")
 SHOW_LOG = True
 
 
-
 class TestTrainer(unittest.TestCase):
-    def setUp(self) -> None:
-        logger = Logger(SHOW_LOG)
-        self.log = logger.get_logger(__name__)
-        self.trainer = Trainer()
+    def setUp(self):
+        self.temp_config = "tmp_config.ini"
+        shutil.copy("test_config.ini", self.temp_config)
+        self.trainer = Trainer(config_path=self.temp_config)
+        # self.trainer = Trainer(config_path="test_config.ini")
 
-    def tearDown(self) -> None:
-        # Cleanup generated files and folders
+    def tearDown(self):
         if os.path.isdir(self.trainer.project_path):
-            for f in os.listdir(self.trainer.project_path):
-                os.remove(os.path.join(self.trainer.project_path, f))
-            os.rmdir(self.trainer.project_path)
+            shutil.rmtree(self.trainer.project_path)
+        if os.path.exists(self.temp_config):
+            os.remove(self.temp_config)
 
     def test_init_data(self):
         self.assertIsNotNone(self.trainer.X_train, "X_train shouldn't be None after initialization")
